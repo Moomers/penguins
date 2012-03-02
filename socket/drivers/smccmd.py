@@ -81,7 +81,7 @@ class SmcCmdDriver(object):
 
    def brake(self, speed):
       for motor in self.motors.keys():
-         self._run_smc_command("--brake %s" % self._convert_brake(speed))
+         self._run_smc_command("--brake %s" % self._convert_brake(speed), motor)
 
    def stop(self):
       self.brake(100)
