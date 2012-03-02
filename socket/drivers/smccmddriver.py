@@ -56,7 +56,7 @@ class SmcCmdDriver(object):
       #easily handle setting both or a single motor
       motors = [motor] if motor else self.motors.keys()
       for motor in motors:
-         self._run_smc_command("--speed %s" % self._convert_speed(speed))
+         self._run_smc_command("--speed %s" % self._convert_speed(speed), motor)
 
    def _get_speed(self, motor):
       """Returns the current speed of a motor"""
