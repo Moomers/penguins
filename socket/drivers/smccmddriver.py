@@ -3,7 +3,7 @@
 import commands
 import re
 
-from drivers import DriverError
+from common import DriverError
 
 class SmcCmdDriver(object):
    """Drives motors using the SmcCmd program for pololu simple motor controllers"""
