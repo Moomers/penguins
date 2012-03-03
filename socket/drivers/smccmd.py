@@ -19,7 +19,7 @@ class SmcCmdDriver(object):
       self.smccmd = smccmd_path
 
       #make sure the controller is ready to run
-      self._set_speed(0)
+      self.set_speed(0)
       for motor in self.motors.keys():
          self._run_smc_command('--resume', motor)
 
@@ -51,33 +51,38 @@ class SmcCmdDriver(object):
 
       return 1 if brake < 3 else int((brake - 3)/3)
 
-   def _set_speed(self, speed, motor = None):
+   ###### the interface of the driver #####
+   def set_speed(self, speed, motor = None):
       """sets the speed of one or both motors"""
       #easily handle setting both or a single motor
       motors = [motor] if motor else self.motors.keys()
       for motor in motors:
          self._run_smc_command("--speed %s" % self._convert_speed(speed), motor)
 
-   def _get_speed(self, motor):
+   def get_speed(self, motor = None):
       """Returns the current speed of a motor"""
-      output = self._run_smc_command('--status', motor)
-      m = self.speed_re.search(output)
-      if m:
-         return int(m.group(1))
-      else:
-         raise DriverError("Cannot find motor speed; SmcCmd said: %s" % output)
+      motors = [motor] if motor else ('left', 'right')
+      speeds = []
+      for motor in motors:
+          output = self._run_smc_command('--status', motor)
+          m = self.speed_re.search(output)
+          if m:
+             speeds.append(int(m.group(1)))
+          else:
+             raise DriverError("Cannot find motor speed; SmcCmd said: %s" % output)
 
-   ###### the interface of the driver #####
+     return speeds if len(speeds) > 1 else speeds[0]
+
    speed = property(
-         lambda self: (self._get_speed('left'), self._get_speed('right')),
-         lambda self, speed: self._set_speed(speed))
+         lambda self: self.get_speed(),
+         lambda self, speed: self.set_speed(speed))
 
    left = property(
-         lambda self: self._get_speed('left'),
-         lambda self, speed: self._set_speed(speed, 'left'))
+         lambda self: self.get_speed('left'),
+         lambda self, speed: self.set_speed(speed, 'left'))
    right = property(
-         lambda self: self._get_speed('right'),
-         lambda self, speed: self._set_speed(speed, 'right'))
+         lambda self: self.get_speed('right'),
+         lambda self, speed: self.set_speed(speed, 'right'))
 
    def brake(self, speed):
       for motor in self.motors.keys():
