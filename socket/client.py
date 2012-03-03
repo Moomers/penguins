@@ -40,7 +40,7 @@ class DriverClient(object):
 
     def get_speed(self, motor = 'both'):
         """Returns the current speed of a motor"""
-        if both:
+        if motor == 'both':
             speeds = self._send_command('speed')
             return [int(s.strip()) for s in speeds.split(',')]
         else:
