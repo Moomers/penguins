@@ -28,33 +28,28 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     output = 'braking initiated'
 
                 if parts[0] in ('speed', 'left', 'right'):
+                    #try to get a number out of parts[1]
                     try:
                         new_speed = parts[1]
                     except:
-                        if parts[1] == 'speed':
-                            speed = driver.speed
-                            output = "%s, %s" % (speed[0], speed[1])
-                        elif parts[1] == 'left':
-                            output = driver.left
-                        elif parts[1] == 'right':
-                            output = driver.right
+                        new_speed = None
                     else:
                         try:
-                            new_speed = int(parts[1])
-                            if speed < -100 or speed > 100:
+                            new_speed = int(new_speed)
+                            if new_speed < -100 or new_speed > 100:
                                 raise ValueError("out of range")
                         except:
                             raise CommandError("speed must be 'get' or a number from -100 to 100")
-                        else:
-                            if parts[1] == 'speed':
-                                driver.speed = new_speed
-                                output = "speed set to %s" % new_speed
-                            elif parts[1] == 'left':
-                                driver.left = new_speed
-                                output = "left set to %s" % new_speed
-                            elif parts[1] == 'right':
-                                driver.right = new_speed
-                                output = "right set to %s" % new_speed
+
+                    #figure out which if any motor we want to deal with
+                    motor = parts[0] if parts[0] in ('left', 'right') else None
+
+                    if new_speed:
+                        driver.set_speed(new_speed, motor)
+                        output = "speed set to %s" % new_speed
+                    else:
+                        speeds = driver.get_speed(motor)
+                        output = ",".join(speeds)
 
             except CommandError, e:
                 self.wfile.write("invalid, %s" % e.message)
