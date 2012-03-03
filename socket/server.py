@@ -1,71 +1,74 @@
 #!/usr/bin/python
 
-import Queue
 import SocketServer
-import threading
-
 import drivers
 
-class Controller(object):
-    """Turns client requests into driver commands"""
-    def __init__(self, command_queue, driver):
-        self.queue = command_queue
-        self.driver = driver
+class CommandError(ValueError):
+    pass
 
-    def controller(self):
-        """The main function, meant to be in a thread, which drives the robot"""
-        while True:
-            command = self.queue.get()
-
-            try:
-                parts = command.split()
-                if parts[0] == 'stop':
-                    self.driver.stop()
-
-                elif parts[0] == 'speed':
-                    self.driver.speed = parts[1]
-                elif parts[0] == 'brake':
-                    self.driver.brake(parts[1])
-
-                elif parts[0] == 'left':
-                    self.driver.left = parts[1]
-                elif parts[0] == 'right':
-                    self.driver.right = parts[1]
-
-            except Exception, e:
-                print "error processing command %s: %s" % (command, str(e))
-
-
-            self.queue.task_done()
-
-class CommandReciever(SocketServer.StreamRequestHandler):
+class DriverHandler(SocketServer.StreamRequestHandler):
     def handle(self):
         """writes requests from the client into a queue"""
         while True:
             command = self.rfile.readline().strip()
-
-            if command == "exit":
+            if command == 'exit':
                 self.wfile.write("done\n")
                 break
 
-            if command == "empty":
-                discarded= []
-                while not self.server.command_queue.empty():
-                    item = self.server.command_queue.get_nowait()
-                    discarded.append(item)
-                    self.server.command_queue.task_done()
-                self.wfile.write("ok, removed %s items\n" % len(discarded))
+            try:
+                driver = self.server.driver
+
+                parts = command.split()
+                if parts[0] == 'stop':
+                    driver.stop()
+                    output = 'robot stopped'
+
+                elif parts[0] == 'brake':
+                    driver.brake(parts[1])
+                    output = 'braking initiated'
+
+                if parts[0] in ('speed', 'left', 'right'):
+                    try:
+                        new_speed = parts[1]
+                    except:
+                        if parts[1] == 'speed':
+                            speed = driver.speed
+                            output = "%s, %s" % (speed[0], speed[1])
+                        elif parts[1] == 'left':
+                            output = driver.left
+                        elif parts[1] == 'right':
+                            output = driver.right
+                    else:
+                        try:
+                            new_speed = int(parts[1])
+                            if speed < -100 or speed > 100:
+                                raise ValueError("out of range")
+                        except:
+                            raise CommandError("speed must be 'get' or a number from -100 to 100")
+                        else:
+                            if parts[1] == 'speed':
+                                driver.speed = new_speed
+                                output = "speed set to %s" % new_speed
+                            elif parts[1] == 'left':
+                                driver.left = new_speed
+                                output = "left set to %s" % new_speed
+                            elif parts[1] == 'right':
+                                driver.right = new_speed
+                                output = "right set to %s" % new_speed
+
+            except CommandError, e:
+                self.wfile.write("invalid, %s" % e.message)
+            except Exception, e:
+                self.wfile.write("error, command %s - %s" % (command, str(e)))
             else:
-                self.server.command_queue.put(command)
-                self.wfile.write("ok, %s commands in the queue\n" % self.server.command_queue.qsize())
+                self.wfile.write("ok, %s" % output)
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 9999
 
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), DriverHandler)
-    server.command_queue = Queue.Queue()
-    #server.driver = driver.SmcCmdDriver()
+    server.driver = drivers.SmcCmdDriver()
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
