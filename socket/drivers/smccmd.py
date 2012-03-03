@@ -52,16 +52,16 @@ class SmcCmdDriver(object):
         return 1 if brake < 3 else int((brake - 3)/3)
 
     ###### the interface of the driver #####
-    def set_speed(self, speed, motor = None):
+    def set_speed(self, speed, motor = 'both'):
         """sets the speed of one or both motors"""
         #easily handle setting both or a single motor
-        motors = [motor] if motor else self.motors.keys()
+        motors = self.motors.keys() if motor == 'both' else [motor]
         for motor in motors:
             self._run_smc_command("--speed %s" % self._convert_speed(speed), motor)
 
-    def get_speed(self, motor = None):
+    def get_speed(self, motor = 'both'):
         """Returns the current speed of a motor"""
-        motors = [motor] if motor else ('left', 'right')
+        motors = ('left', 'right') if motor == 'both' else [motor]
         speeds = []
         for motor in motors:
              output = self._run_smc_command('--status', motor)
@@ -71,17 +71,17 @@ class SmcCmdDriver(object):
              else:
                  raise DriverError("Cannot find motor speed; SmcCmd said: %s" % output)
 
-        return speeds if len(speeds) > 1 else speeds[0]
+        return speeds
 
     speed = property(
-            lambda self: self.get_speed(),
-            lambda self, speed: self.set_speed(speed))
+            lambda self: self.get_speed('both'),
+            lambda self, speed: self.set_speed(speed, 'both'))
 
     left = property(
-            lambda self: self.get_speed('left'),
+            lambda self: self.get_speed('left')[0],
             lambda self, speed: self.set_speed(speed, 'left'))
     right = property(
-            lambda self: self.get_speed('right'),
+            lambda self: self.get_speed('right')[0],
             lambda self, speed: self.set_speed(speed, 'right'))
 
     def brake(self, speed):
