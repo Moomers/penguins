@@ -11,6 +11,10 @@ class DriverHandler(SocketServer.StreamRequestHandler):
         """writes requests from the client into a queue"""
         while True:
             command = self.rfile.readline().strip()
+            if not command:
+                self.wfile.write("\n")
+                continue
+
             if command == 'exit':
                 self.wfile.write("done\n")
                 break
@@ -52,11 +56,11 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                         output = ",".join(speeds)
 
             except CommandError, e:
-                self.wfile.write("invalid, %s" % e.message)
+                self.wfile.write("invalid, %s\n" % e.message)
             except Exception, e:
-                self.wfile.write("error, command %s - %s" % (command, str(e)))
+                self.wfile.write("error, command %s - %s\n" % (command, str(e)))
             else:
-                self.wfile.write("ok, %s" % output)
+                self.wfile.write("ok, %s\n" % output)
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 9999
