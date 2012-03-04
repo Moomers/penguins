@@ -64,10 +64,14 @@ class DriverHandler(SocketServer.StreamRequestHandler):
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 9999
+    left = '3000-6A06-3142-3732-7346-2543'
+    right = '3000-6F06-3142-3732-4454-2543'
+    smcpath = '/root/pololu/smc_linux/SmcCmd'
+    driver = drivers.SmcCmdDriver(left, right, smcpath)
 
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), DriverHandler)
-    server.driver = drivers.SmcCmdDriver()
+    server.driver = driver
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
