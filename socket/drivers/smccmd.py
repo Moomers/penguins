@@ -33,7 +33,14 @@ class SmcCmdDriver(object):
 
         status, output = commands.getstatusoutput(" ".join(final_command))
         if status:
-            raise DriverError(output)
+            if 'could not find a device' in output:
+                missing = output.split('serial number ')[1].rstrip('.')
+                for side, mid in self.motors.items():
+                    if mid == missing:
+                        raise DriverError("%s motor has gone away" % side)
+                raise DriverError("motor %s is missing" % missing)
+            else:
+                raise DriverError(output)
         else:
             return output
 
