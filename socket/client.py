@@ -13,6 +13,8 @@ class DriverClient(object):
         """Sends a command to the server"""
         command = "%s\n" % (command.strip())
         self.server.write(command)
+        self.server.flush()
+
         result = self.server.readline().split(',', 1)
         if result[0] == 'ok':
             return result[1].strip()

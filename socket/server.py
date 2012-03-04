@@ -23,10 +23,12 @@ class DriverHandler(SocketServer.StreamRequestHandler):
             command = self.rfile.readline().strip()
             if not command:
                 self.wfile.write("\n")
+                self.wfile.flush()
                 continue
 
             if command == 'exit':
                 self.wfile.write("done\n")
+                self.wfile.flush()
                 break
 
             try:
@@ -72,11 +74,14 @@ class DriverHandler(SocketServer.StreamRequestHandler):
 
             except CommandError, e:
                 self.wfile.write("invalid, %s\n" % e.message)
+                self.wfile.flush()
             except Exception, e:
                 traceback.print_exc()
                 self.wfile.write("error, command %s - %s\n" % (command, str(e)))
+                self.wfile.flush()
             else:
                 self.wfile.write("ok, %s\n" % output)
+                self.wfile.flush()
 
 if __name__ == "__main__":
     HOST, PORT = '', 9999
