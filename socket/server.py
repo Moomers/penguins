@@ -1,12 +1,22 @@
 #!/usr/bin/python
 
 import SocketServer
-import drivers
+from drivers.smccmd import SmcCmdDriver
+import traceback
 
 class CommandError(ValueError):
     pass
 
 class DriverHandler(SocketServer.StreamRequestHandler):
+    def parse_speed(self, parts):
+        "parses the speed that comes over the wire into an int or None"
+        try:
+            new_speed = parts[1]
+        except:
+            return None
+        else:
+            return int(new_speed)
+
     def handle(self):
         """writes requests from the client into a queue"""
         while True:
@@ -28,46 +38,52 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     output = 'robot stopped'
 
                 elif parts[0] == 'brake':
-                    driver.brake(parts[1])
+                    try:
+                        new_speed = self.parse_speed(parts)
+                        if new_speed < 1 or new_speed > 100:
+                            raise ValueError("out of range")
+                    except:
+                        raise CommandError("brake must be a number from 1 to 100")
+
+                    driver.brake(new_speed)
                     output = 'braking initiated'
 
-                if parts[0] in ('speed', 'left', 'right'):
+                elif parts[0] in ('speed', 'left', 'right'):
                     #try to get a number out of parts[1]
                     try:
-                        new_speed = parts[1]
-                    except:
-                        new_speed = None
-                    else:
-                        try:
-                            new_speed = int(new_speed)
-                            if new_speed < -100 or new_speed > 100:
-                                raise ValueError("out of range")
-                        except:
-                            raise CommandError("speed must be 'get' or a number from -100 to 100")
+                        new_speed = self.parse_speed(parts)
+                        if new_speed and (new_speed < -100 or new_speed > 100):
+                            raise ValueError("out of range")
+                    except Exception, e:
+                        raise CommandError("speed must be a number from -100 to 100, %s" % e)
 
                     #figure out which if any motor we want to deal with
-                    motor = parts[0] if parts[0] in ('left', 'right') else None
+                    motor = parts[0] if parts[0] in ('left', 'right') else 'both'
 
-                    if new_speed:
+                    if new_speed is not None:
                         driver.set_speed(new_speed, motor)
                         output = "speed set to %s" % new_speed
                     else:
                         speeds = driver.get_speed(motor)
-                        output = ",".join(speeds)
+                        output = ",".join([str(s) for s in speeds])
+
+                else:
+                    raise CommandError("invalid command '%s'" % command)
 
             except CommandError, e:
                 self.wfile.write("invalid, %s\n" % e.message)
             except Exception, e:
+                traceback.print_exc()
                 self.wfile.write("error, command %s - %s\n" % (command, str(e)))
             else:
                 self.wfile.write("ok, %s\n" % output)
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 9999
+    HOST, PORT = '', 9999
     left = '3000-6A06-3142-3732-7346-2543'
     right = '3000-6F06-3142-3732-4454-2543'
     smcpath = '/root/pololu/smc_linux/SmcCmd'
-    driver = drivers.SmcCmdDriver(left, right, smcpath)
+    driver = SmcCmdDriver(left, right, smcpath)
 
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), DriverHandler)
