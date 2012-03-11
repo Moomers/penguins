@@ -147,6 +147,28 @@ class SimpleMotorController(object):
         if status != 'running':
             raise common.ControllerError("Motor still stopped after reset; additional errors may be present")
 
+    def stop(self):
+        """Stops the motor on this controller"""
+        #self._send_comand("X")
+        self.brake(32)
+
+    def brake(self, speed):
+        """Slows down the motor with the specified acceleration"""
+        self._send_command("B%d" % speed)
+
+    def get_speed(self):
+        """Returns current speed"""
+        return self._get_variable(21)
+    def set_speed(self, speed):
+        """Sets the current speed"""
+        cmd = 'R' if speed < 0 else 'F'
+        self._send_comand("%s%d" % (cmd, abs(speed)))
+
+    speed = property(
+            lambda self: self.get_speed(),
+            lambda self, speed: self.set_speed(speed),
+            )
+
 def get_serial_by_port(port):
     """gets the serial number corresponding to the device on the port"""
     #get the controller's serial number out of sysfs
