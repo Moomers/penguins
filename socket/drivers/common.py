@@ -6,6 +6,17 @@ class DriverError(Exception):
 
 class ControllerError(DriverError):
     """Used when there's an error inside a controller, which is part of the overall driver"""
+    STATUS = {
+            0:'safe start violation',
+            1:'channel invalid',
+            2:'serial error',
+            3:'command timeout',
+            4:'limit/kill switch',
+            5:'low vin',
+            6:'high vin',
+            7:'over temperature',
+            8:'motor driver error',
+            9:'err line high'}
 
 class SmcDriver(object):
     """A common driver which drives around using two SMC controllers"""

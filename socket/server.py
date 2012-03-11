@@ -1,11 +1,17 @@
 #!/usr/bin/python
 
 import SocketServer
-import drivers, drivers.smcserial
+import drivers, drivers.smcserial, drivers.smcstub
+import sys
 import traceback
 
 class CommandError(ValueError):
     pass
+
+class TCPServer(SocketServer.TCPServer):
+    # Bind to our port even if it's in TIME_WAIT, so we can restart the
+    # server right away.
+    allow_reuse_address = True
 
 class DriverHandler(SocketServer.StreamRequestHandler):
     def parse_speed(self, parts):
@@ -89,12 +95,19 @@ if __name__ == "__main__":
     right = '3000-6F06-3142-3732-4454-2543'
     smcpath = '/root/pololu/smc_linux/SmcCmd'
 
-    driver = drivers.smcserial.get_driver(left, right, smcpath)
+    if len(sys.argv) > 1 and sys.argv[1] == 'stub':
+        driver = drivers.smcstub.get_driver(left, right)
+    else:
+        driver = drivers.smcserial.get_driver(left, right, smcpath)
 
     # Create the server, binding to localhost on port 9999
-    server = SocketServer.TCPServer((HOST, PORT), DriverHandler)
+    server = TCPServer((HOST, PORT), DriverHandler)
     server.driver = driver
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt, e:
+        print 'Shutting down.'
+        server.server_close()

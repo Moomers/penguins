@@ -34,7 +34,7 @@ class SimpleMotorController(object):
         self.dev.write('\n')
         self.dev.flush()
         if self.dev.inWaiting():
-            self.dev.read(self.inWaiting())
+            self.dev.read(self.dev.inWaiting())
 
     def _ensure_ascii_mode(self):
         """Makes sure the controller is set into ascii mode using SmcCmd"""
@@ -125,19 +125,7 @@ class SimpleMotorController(object):
         status = self._get_version()
 
         #are we having any errors atm?
-        errors = {
-                0:'safe start violation',
-                1:'channel invalid',
-                2:'serial error',
-                3:'command timeout',
-                4:'limit/kill switch',
-                5:'low vin',
-                6:'high vin',
-                7:'over temperature',
-                8:'motor driver error',
-                9:'err line high'}
-
-        status['errors'] = self._bit_query(errors, self._get_variable(0))
+        status['errors'] = self._bit_query(common.ControllerError.STATUS, self._get_variable(0))
         return status
 
     def reset(self):
