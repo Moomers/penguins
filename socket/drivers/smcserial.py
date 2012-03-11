@@ -20,16 +20,12 @@ class SimpleMotorController(object):
         if not os.path.exists(port):
             raise ValueError("No such port '%s'" % port)
 
-        #get the controller's serial number out of sysfs
-        devname = os.path.basename(port)
-        try:
-            self.serial = open('/sys/class/tty/%s/device/../serial' % devname).read().strip()
-        except:
-            raise ValueError("Cannot retrieve serial number for device '%s'" % devname)
+        #get the serial number
+        self.serial = get_serial_by_port(port)
 
         #make sure we're in ascii mode
         self.smccmd = smccmd
-        self._check_mode()
+        self._ensure_ascii_mode()
 
         #open the serial connection
         self.dev = serial.Serial(port, timeout = 1)
@@ -40,7 +36,7 @@ class SimpleMotorController(object):
         if self.dev.inWaiting():
             self.dev.read(self.inWaiting())
 
-    def _check_mode(self):
+    def _ensure_ascii_mode(self):
         """Makes sure the controller is set into ascii mode using SmcCmd"""
         fd, temp_name = tempfile.mkstemp()
         try:
@@ -109,14 +105,7 @@ class SimpleMotorController(object):
         parts = output.split()
         return {'product':parts[0], 'firmware':parts[1]}
 
-    def _reset(self):
-        """Sets the motor speed to 0 and exits safe-start"""
-        self.speed = 0
-        status, output = self._send_command('GO')
-        if status != 'running':
-            raise common.ControllerError("Motor still stopped after reset; additional errors may be present")
-
-    def _bitwise_query(self, bits, data):
+    def _bit_query(self, bits, data):
         """Determines which of the bits in `bits` is set in `data`
 
         Bits should be a mapping from bit => bit name;
@@ -128,6 +117,7 @@ class SimpleMotorController(object):
 
         return result
 
+    ############# Public Interface #############
     @property
     def status(self):
         """Returns the status of the controller"""
@@ -147,5 +137,49 @@ class SimpleMotorController(object):
                 8:'motor driver error',
                 9:'err line high'}
 
-        status['errors'] = self._bitwise_query(errors, self._get_variable(0))
+        status['errors'] = self._bit_query(errors, self._get_variable(0))
         return status
+
+    def reset(self):
+        """Gets the controller ready to drive"""
+        self.speed = 0
+        status, output = self._send_command('GO')
+        if status != 'running':
+            raise common.ControllerError("Motor still stopped after reset; additional errors may be present")
+
+def get_serial_by_port(port):
+    """gets the serial number corresponding to the device on the port"""
+    #get the controller's serial number out of sysfs
+    devname = os.path.basename(port)
+    try:
+        return open('/sys/class/tty/%s/device/../serial' % devname).read().strip()
+    except:
+        raise ValueError("Cannot retrieve serial number for device '%s'" % devname)
+
+def get_driver(left_id, right_id, smccmd):
+    """Utility function which returns a driver using the controllers defined here"""
+    controllers = {
+            'left':{'serial':left_id, 'controller':None},
+            'right':{'serial':right_id, 'controller':None},
+            }
+
+    #look through ttyACM devices to find one with a matching serial number
+    files = os.listdir('/dev')
+    for f in files:
+        if not f.startswith('ttyACM'):
+            continue
+
+        port = os.path.join('/dev', f)
+        serial = get_serial_by_port(port)
+
+        for c in controllers.values():
+            if c['serial'] == serial:
+                c['controller'] = SimpleMotorController(port, smccmd)
+
+    #make sure we have controllers for both sides
+    for side, c in controllers.items():
+        if not c['controller']:
+            raise common.DriverError("Cannot find controller with serial number %s (%s side)" % (c['serial'], side))
+
+    #return the driver using the two controllers we found
+    return common.SmcDriver(controllers['left']['controller'], controllers['right']['controller'])
