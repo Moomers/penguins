@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import SocketServer
-from drivers.smccmd import SmcCmdDriver
+import drivers, drivers.smcserial
 import traceback
 
 class CommandError(ValueError):
@@ -88,7 +88,8 @@ if __name__ == "__main__":
     left = '3000-6A06-3142-3732-7346-2543'
     right = '3000-6F06-3142-3732-4454-2543'
     smcpath = '/root/pololu/smc_linux/SmcCmd'
-    driver = SmcCmdDriver(left, right, smcpath)
+
+    driver = drivers.smcserial.get_driver(left, right, smcpath)
 
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), DriverHandler)
