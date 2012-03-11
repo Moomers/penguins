@@ -3,7 +3,7 @@
 import commands
 import re
 
-from common import DriverError
+import common
 
 class SmcCmdDriver(object):
     """Drives motors using the SmcCmd program for pololu simple motor controllers"""
@@ -37,24 +37,24 @@ class SmcCmdDriver(object):
                 missing = output.split('serial number ')[1].rstrip('.')
                 for side, mid in self.motors.items():
                     if mid == missing:
-                        raise DriverError("%s motor has gone away" % side)
-                raise DriverError("motor %s is missing" % missing)
+                        raise common.DriverError("%s motor has gone away" % side)
+                raise common.DriverError("motor %s is missing" % missing)
             else:
-                raise DriverError(output)
+                raise common.DriverError(output)
         else:
             return output
 
     def _convert_speed(self, speed):
         """We want to specify speeds from 0 to 100, but the pololu uses 0 to 3200"""
         if speed > 100 or speed < -100:
-            raise DriverError("Speed outside the normal range")
+            raise common.DriverError("Speed outside the normal range")
 
         return speed * 32
 
     def _convert_brake(self, brake):
         """We want a breaking value from 1 to 100, but the pololu uses 1 to 32"""
         if brake < 1 or brake > 100:
-            raise DriverError("Braking speed outside the normal range")
+            raise common.DriverError("Braking speed outside the normal range")
 
         return 1 if brake < 3 else int((brake - 3)/3)
 
@@ -76,7 +76,7 @@ class SmcCmdDriver(object):
              if m:
                  speeds.append(int(m.group(1)))
              else:
-                 raise DriverError("Cannot find motor speed; SmcCmd said: %s" % output)
+                 raise common.DriverError("Cannot find motor speed; SmcCmd said: %s" % output)
 
         return speeds
 
