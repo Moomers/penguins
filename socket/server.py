@@ -68,6 +68,9 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 elif parts[0] == 'status':
                     output = driver.status
 
+                elif parts[0] == 'reset':
+                    output = driver.reset
+
                 elif parts[0] in ('speed', 'left', 'right'):
                     #try to get a number out of parts[1]
                     try:

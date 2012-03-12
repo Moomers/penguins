@@ -41,6 +41,9 @@ class DriverClient(object):
     def stop(self):
         return self._send_command("stop")
 
+    def reset(self):
+        return self_send_command('reset')
+
     @property
     def status(self):
         return self._send_command('status')
