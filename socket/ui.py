@@ -100,11 +100,6 @@ class CursesUI(object):
                 self.write_line(windows[side], linenum, line)
                 linenum += 1
 
-    def set_key_down(self):
-        if not self._is_key_down:
-            self._key_down_time = time.time()
-            self._is_key_down = True
-
     def run(self):
         """The main loop"""
         while True:
