@@ -172,7 +172,7 @@ class SMCSerialController(object):
 
     def stop(self):
         """Stops the motor on this controller"""
-        self._send_comand("X")
+        self._send_command("X")
 
     def brake(self, speed):
         """Slows down the motor with the specified acceleration"""
