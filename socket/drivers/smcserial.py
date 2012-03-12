@@ -11,7 +11,7 @@ from xml.etree import ElementTree
 
 import common
 
-class SimpleMotorController(object):
+class SMCSerialController(object):
     """Represents a single SMC accessible via a serial port"""
     def __init__(self, port, smccmd):
         """Initializes the serial port and establishes communication with the SMC there
@@ -197,7 +197,7 @@ def get_serial_by_port(port):
     except:
         raise ValueError("Cannot retrieve serial number for device '%s'" % devname)
 
-def get_driver(left_id, right_id, smccmd):
+def get_driver(left, right, smccmd, **rest):
     """Utility function which returns a driver using the controllers defined here"""
     controllers = {
             'left':{'serial':left_id, 'controller':None},
@@ -218,7 +218,7 @@ def get_driver(left_id, right_id, smccmd):
 
         for c in controllers.values():
             if c['serial'] == serial:
-                c['controller'] = SimpleMotorController(port, smccmd)
+                c['controller'] = SMCSerialController(port, smccmd)
 
     #make sure we have controllers for both sides
     for side, c in controllers.items():
@@ -226,7 +226,6 @@ def get_driver(left_id, right_id, smccmd):
             raise common.DriverError("Cannot find controller with serial number %s (%s side)" % (c['serial'], side))
         else:
             print "Found %s controller on port %s" % (side, c['controller'].port)
-
 
     #return the driver using the two controllers we found
     return common.SmcDriver(controllers['left']['controller'], controllers['right']['controller'])

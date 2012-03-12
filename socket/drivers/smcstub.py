@@ -2,7 +2,7 @@
 
 import common
 
-class SimpleMotorController(object):
+class SMCStubController(object):
     """A fake SMC for interface testing."""
     def __init__(self, port):
         self._port = port
@@ -15,7 +15,8 @@ class SimpleMotorController(object):
                 'product':'stub',
                 'firmware':'1.00',
                 'errors': dict((cond, False) for cond in
-                               common.ControllerError.STATUS.values()),
+                               common.SMCControllerErrors.values()),
+
                 'speed':self.speed,
                 }
 
@@ -44,7 +45,7 @@ class SimpleMotorController(object):
 
     speed = property(get_speed, set_speed)
 
-def get_driver(left_id, right_id):
+def get_driver(left, right, **rest):
     """Utility function which returns a driver using the controllers defined here"""
-    return common.SmcDriver(SimpleMotorController(left_id),
-                            SimpleMotorController(right_id))
+    return common.SmcDriver(SMCStubController(left),
+                            SMCStubController(right))
