@@ -1,8 +1,6 @@
 #!/usr/bin/python
 
-import client
 import curses
-import sys
 import time
 
 BASE_SPEED = 50
@@ -115,8 +113,10 @@ class CursesUI(object):
             elif c == ord('s'):
                 self.update_status()
                 self.write_result('Status updated')
-            elif c == ord('p'):
-                self.write_result('Bob was here at %s' % time.time())
+            elif c == ord('r'):
+                self.write_result(self.client.reset())
+
+            #movement commands
             elif c == curses.KEY_UP:
                 self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(BASE_SPEED)
@@ -131,11 +131,15 @@ class CursesUI(object):
             elif c == curses.KEY_DOWN:
                 self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(-BASE_SPEED)
+
+            #no command recieved
             elif c == -1:
                 self.client.stop()
                 self.write_result('stopped.')
             else:
-                self.write_result('we got something odd: "%d"' % c)
-            self._last_key = c
-            self.update_status()
+                self.write_result('Unknown key: "%d"' % c)
 
+            #save the last key we hit
+            self._last_key = c
+            if c != ord('s'):
+                self.update_status()
