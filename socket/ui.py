@@ -21,7 +21,7 @@ class CursesUI(object):
         self.stdscr.keypad(1)
 
         curses.curs_set(0)
-        curses.halfdelay(5)
+        curses.halfdelay(1)
 
         #lets do everything else in a try so we can clean up
         try:
