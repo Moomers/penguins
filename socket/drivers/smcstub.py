@@ -7,6 +7,8 @@ class SMCStubController(object):
     def __init__(self, port):
         self._port = port
         self._speed = 0
+        self._brake = 0
+        self._safe = True
 
     @property
     def status(self):
@@ -18,14 +20,19 @@ class SMCStubController(object):
                                common.SMCControllerErrors.values()),
 
                 'speed':self.speed,
+                'braking':self._brake,
                 }
+
+        if self._safe:
+            status['errors']['safe start violation'] = True
 
         return status
 
 
     def reset(self):
         print '%s: reset()' % self._port
-        pass
+        self.speed = 0
+        self._safe = False
 
     def stop(self):
         print '%s: stop()' % self._port
@@ -33,7 +40,7 @@ class SMCStubController(object):
 
     def brake(self, accel):
         print '%s: brake(%d)' % (self._port, accel)
-        pass
+        self._brake = accel
 
     def get_speed(self):
         print '%s: get_speed() = %d' % (self._port, self._speed)
