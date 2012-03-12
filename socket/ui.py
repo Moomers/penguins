@@ -10,10 +10,9 @@ TURN_SPEED = 40
 
 class CursesUI(object):
     """A curses UI or talking to a driver via client"""
-    def __init__(self, host, port):
-        """Initializes ncurses and the client interface"""
-        #initialize the client
-        self.client = client.DriverClient(host, port)
+    def __init__(self, client):
+        """Initializes ncurses"""
+        self.client = client
 
         #initialize ncurses
         self.stdscr = curses.initscr()
@@ -140,9 +139,3 @@ class CursesUI(object):
             self._last_key = c
             self.update_status()
 
-if __name__ == "__main__":
-    ui = CursesUI('localhost', 9999)
-    try:
-        ui.run()
-    finally:
-        ui.cleanup()
