@@ -152,11 +152,12 @@ def main():
     server.driver = driver
 
     try:
-        server.server_forever()
-    except:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        return 0
+    finally:
         print "Shutting down"
         server.server_close()
-    finally:
         driver.stop()
 
 if __name__ == "__main__":
