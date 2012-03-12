@@ -117,6 +117,8 @@ class CursesUI(object):
                 self.write_result(self.client.reset())
             elif c == ord('b'):
                 self.write_result(self.client.brake(100))
+            elif c == ord('x'):
+                self.write_result(self.client.stop())
 
             #movement commands
             elif c == curses.KEY_UP:
