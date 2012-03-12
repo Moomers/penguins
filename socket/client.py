@@ -24,7 +24,7 @@ class DriverClient(object):
         if result[0] == 'ok':
             return result[1]
         else:
-            raise Exception(str(result[1]))
+            raise Exception(str(result))
 
     ###### the interface of the driver #####
     def brake(self, speed):
