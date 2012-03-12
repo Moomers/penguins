@@ -77,7 +77,7 @@ class CursesUI(object):
         self.write_line(window, 0, title, left_margin = 3, nopad = True)
 
     def write_result(self, result):
-        self.write_line(self.windows['result'], 1, result)
+        self.write_line(self.windows['result'], 1, str(result))
 
     def update_status(self):
         """puts the current status into the status windows"""
@@ -115,6 +115,8 @@ class CursesUI(object):
                 self.write_result('Status updated')
             elif c == ord('r'):
                 self.write_result(self.client.reset())
+            elif c == ord('b'):
+                self.write_result(self.client.brake(100))
 
             #movement commands
             elif c == curses.KEY_UP:
@@ -134,8 +136,7 @@ class CursesUI(object):
 
             #no command recieved
             elif c == -1:
-                self.client.stop()
-                self.write_result('stopped.')
+                self.write_result(self.client.brake(100))
             else:
                 self.write_result('Unknown key: "%d"' % c)
 
