@@ -5,7 +5,8 @@ import curses
 import sys
 import time
 
-BASE_SPEED = 10
+BASE_SPEED = 50
+TURN_SPEED = 40
 
 class CursesUI(object):
     """A curses UI or talking to a driver via client"""
@@ -121,13 +122,13 @@ class CursesUI(object):
                 self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(BASE_SPEED)
             elif c == curses.KEY_LEFT:
-                self.write_result('Turning left at speed: %s' % BASE_SPEED)
-                self.client.left = -BASE_SPEED
-                self.client.right = BASE_SPEED
+                self.write_result('Turning left at speed: %s' % TURN_SPEED)
+                self.client.left = -TURN_SPEED
+                self.client.right = TURN_SPEED
             elif c == curses.KEY_RIGHT:
-                self.write_result('Turning right at speed: %s' % BASE_SPEED)
-                self.client.left = BASE_SPEED
-                self.client.right = -BASE_SPEED
+                self.write_result('Turning right at speed: %s' % TURN_SPEED)
+                self.client.left = TURN_SPEED
+                self.client.right = -TURN_SPEED
             elif c == curses.KEY_DOWN:
                 self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(-BASE_SPEED)
