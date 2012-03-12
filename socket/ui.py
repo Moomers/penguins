@@ -123,6 +123,7 @@ class CursesUI(object):
             elif c == ord('p'):
                 self.write_result('Bob was here at %s' % time.time())
             elif c == curses.KEY_UP:
+                self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(BASE_SPEED)
             elif c == -1:
                 self.client.stop()
@@ -130,6 +131,7 @@ class CursesUI(object):
             else:
                 self.write_result('we got something odd: "%d"' % c)
             self._last_key = c
+            self.update_status()
 
 if __name__ == "__main__":
     ui = CursesUI('localhost', 9999)
