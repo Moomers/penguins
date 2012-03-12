@@ -126,6 +126,7 @@ class SimpleMotorController(object):
 
         #are we having any errors atm?
         status['errors'] = self._bit_query(common.ControllerError.STATUS, self._get_variable(0))
+        status['speed'] = self.speed
         return status
 
     def reset(self):
