@@ -1,6 +1,9 @@
 import socket
 import cPickle as pickle
 
+from optparse import OptionParser, OptionGroup
+import ui
+
 HOST, PORT = "localhost", 9999
 class DriverClient(object):
     def __init__(self, host, port):
@@ -25,6 +28,11 @@ class DriverClient(object):
             return result[1]
         else:
             raise Exception(str(result))
+
+    def disconnect(self):
+        """Stops the motors and disconnects from the server"""
+        self.stop()
+        self.sock.close()
 
     ###### the interface of the driver #####
     def brake(self, speed):
@@ -67,3 +75,47 @@ class DriverClient(object):
     right = property(
             lambda self: self.get_speed('right')[0],
             lambda self, speed: self.set_speed(speed, 'right'))
+
+def main():
+    """If run directly, we will connect to a server and run the specified UI"""
+    uilist = {
+            'curses':("NCurses-based UI using arrow keys for steering", ui.CursesUI),
+            }
+
+    parser = OptionParser()
+    parser.add_option('-i', '--ui', action="store", type="choice", dest="ui", default="curses", choices=uilist.keys(),
+            help="Start up this UI [Default: curses]")
+    parser.add_option('-a', '--host', action="store", type="string", dest="host", default="localhost",
+            help="Host/address to connect to [Default: localhost]")
+    parser.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
+            help="Port the server is listening on [Default: 9999]")
+
+    parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
+            help="Print more debug info")
+
+    parser.add_option("--list", action="store_true", dest="list", default=False,
+            help="List the available UIs")
+
+
+    options, args = parser.parse_args()
+    if options.list:
+        for name, info in uilist.items():
+            print "%s %s" % (name.ljustify(30), info[0])
+        return 0
+
+    client = DriverClient(options.host, options.port)
+    try:
+        try:
+            interface = uilist[options.ui][1](client)
+        except:
+            parser.error("Cannot create UI '%s'" % options.ui)
+        else:
+            try:
+                interface.run()
+            finally:
+                interface.cleanup()
+    finally:
+        client.disconnect()
+
+if __name__ == "__main__":
+    main()
