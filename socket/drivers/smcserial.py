@@ -153,9 +153,13 @@ class SMCSerialController(object):
         status = self._get_version()
 
         #are we having any errors atm?
-        status['errors'] = self._bit_query(common.ControllerError.STATUS, self._get_variable(0))
+        status['errors'] = self._bit_query(common.SMCControllerErrors, self._get_variable(0))
+        status['braking'] = self._get_variable(22)
+        status['input voltage'] = self._get_variable(23)
+        status['temperature'] = self._get_variable(24)
+
         status['speed'] = self.speed
-        status['reset_count'] = self.reset_count
+        status['reset count'] = self.reset_count
 
         return status
 
@@ -168,8 +172,7 @@ class SMCSerialController(object):
 
     def stop(self):
         """Stops the motor on this controller"""
-        #self._send_comand("X")
-        self.brake(32)
+        self._send_comand("X")
 
     def brake(self, speed):
         """Slows down the motor with the specified acceleration"""
@@ -183,10 +186,7 @@ class SMCSerialController(object):
         cmd = 'R' if speed < 0 else 'F'
         self._send_command("%s%d" % (cmd, abs(speed)))
 
-    speed = property(
-            lambda self: self.get_speed(),
-            lambda self, speed: self.set_speed(speed),
-            )
+    speed = property(get_speed, set_speed)
 
 def get_serial_by_port(port):
     """gets the serial number corresponding to the device on the port"""
