@@ -19,6 +19,8 @@ class SimpleMotorController(object):
                 'speed':self.speed,
                 }
 
+        return status
+
 
     def reset(self):
         print '%s: reset()' % self._port
