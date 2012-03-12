@@ -26,17 +26,17 @@ class CursesUI(object):
             #initialize the windows
             self.windows = {'stdscr':self.stdscr}
 
-            left = curses.newwin(30, 80, 0, 0)
+            left = curses.newwin(30, 40, 0, 0)
             left.box()
             self.add_title(left, " Left Motor Status ")
             self.windows['left'] = left
 
-            right = curses.newwin(30, 100, 0, 80)
+            right = curses.newwin(30, 40, 0, 41)
             right.box()
             self.add_title(right, " Right Motor Status ")
             self.windows['right'] = right
 
-            result = curses.newwin(3, 200, 31, 0)
+            result = curses.newwin(3, 81, 31, 0)
             result.box()
             self.add_title(result, " Last Result ")
             self.windows['result'] = result
@@ -78,7 +78,23 @@ class CursesUI(object):
         self.write_line(self.windows['result'], 1, result)
 
     def update_status(self):
-        pass
+        """puts the current status into the status windows"""
+        status = self.client.status
+        windows = {'right':self.windows['right'], 'left':self.windows['left']}
+        for side, s in status.items():
+            linenum = 1
+            for key in s:
+                if key == 'errors':
+                    continue
+                else:
+                    line = "%s %s" % (key[:30].ljust(30), s[key])
+                    self.write_line(windows[side], linenum, line)
+                    linenum += 1
+
+            for error, value in s['errors'].items():
+                line = "error %s %s" % (error[:24].ljust(24), value)
+                self.write_line(windows[side], linenum, line)
+                linenum += 1
 
     def run(self):
         """The main loop"""
@@ -91,6 +107,9 @@ class CursesUI(object):
                 break
             elif c == -1:
                 self.write_result("no key pressed")
+            elif c == ord('s'):
+                self.update_status()
+                self.write_result('Status updated')
             elif c == ord('p'):
                 self.write_result('Bob was here at %s' % time.time())
             else:
