@@ -11,8 +11,14 @@ class SimpleMotorController(object):
     @property
     def status(self):
         print '%s: status()' % self._port
-        return {'errors': dict((cond, False) for cond in
-                               common.ControllerError.STATUS.values())}
+        status = {
+                'product':'stub',
+                'firmware':'1.00',
+                'errors': dict((cond, False) for cond in
+                               common.ControllerError.STATUS.values()),
+                'speed':self.speed,
+                }
+
 
     def reset(self):
         print '%s: reset()' % self._port
@@ -25,7 +31,7 @@ class SimpleMotorController(object):
     def brake(self, accel):
         print '%s: brake(%d)' % (self._port, accel)
         pass
-    
+
     def get_speed(self):
         print '%s: get_speed() = %d' % (self._port, self._speed)
         return self._speed
