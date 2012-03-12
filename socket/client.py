@@ -100,8 +100,10 @@ def main():
 
     options, args = parser.parse_args()
     if options.list:
+        print "Available UIs:"
         for name, info in uilist.items():
-            print "%s %s" % (name.ljustify(30), info[0])
+            print "%s %s" % (name.ljust(30), info[0])
+
         return 0
 
     client = DriverClient(options.host, options.port)
