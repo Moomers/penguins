@@ -5,6 +5,8 @@ import curses
 import sys
 import time
 
+BASE_SPEED = 10
+
 class CursesUI(object):
     """A curses UI or talking to a driver via client"""
     def __init__(self, host, port):
@@ -45,6 +47,8 @@ class CursesUI(object):
             self.cleanup()
             raise
 
+        self._last_key = -1
+
     def cleanup(self):
         """Clean up ncurses"""
         self.stdscr.keypad(0)
@@ -80,6 +84,11 @@ class CursesUI(object):
     def update_status(self):
         pass
 
+    def set_key_down(self):
+        if not self._is_key_down:
+            self._key_down_time = time.time()
+            self._is_key_down = True
+
     def run(self):
         """The main loop"""
         while True:
@@ -87,14 +96,21 @@ class CursesUI(object):
                 window.refresh()
 
             c = self.stdscr.getch()
+            if c == self._last_key:
+                continue
+
             if c == ord('q'):
                 break
-            elif c == -1:
-                self.write_result("no key pressed")
             elif c == ord('p'):
                 self.write_result('Bob was here at %s' % time.time())
+            elif c == curses.KEY_UP:
+                self.client.set_speed(BASE_SPEED)
+            elif c == -1:
+                self.client.stop()
+                self.write_result('stopped.')
             else:
                 self.write_result('we got something odd: "%d"' % c)
+            self._last_key = c
 
 if __name__ == "__main__":
     ui = CursesUI('localhost', 9999)
