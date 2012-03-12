@@ -1,4 +1,5 @@
 import socket
+import cPickle as pickle
 
 HOST, PORT = "localhost", 9999
 class DriverClient(object):
@@ -16,11 +17,12 @@ class DriverClient(object):
         self.server.flush()
 
         result = self.server.readline().split(',', 1)
-        if result[0] == 'ok':
-            return result[1].strip()
-        else:
-            raise Exception(result[1].strip())
+        output = pickle.loads(result[1].strip())
 
+        if result[0] == 'ok':
+            return output
+        else:
+            raise output
 
     ###### the interface of the driver #####
     def brake(self, speed):
@@ -48,6 +50,10 @@ class DriverClient(object):
         else:
             speed = self._send_command(motor)
             return [int(speed.strip())]
+
+    @property
+    def status(self):
+        return self._send_comand('status')
 
     speed = property(
             lambda self: self.get_speed('both'),
