@@ -1,10 +1,11 @@
 #!/usr/bin/python
 
 import SocketServer
-import drivers, drivers.smcserial, drivers.smcstub
+import drivers, drivers.smcserial, drivers.smcstub, drivers.smccmd
 import cPickle as pickle
-import sys
 import traceback
+
+from optparse import OptionParser, OptionGroup
 
 class CommandError(ValueError):
     pass
@@ -97,25 +98,60 @@ class DriverHandler(SocketServer.StreamRequestHandler):
             else:
                 self.send_output('ok', output)
 
-if __name__ == "__main__":
-    HOST, PORT = '', 9999
-    left = '3000-6A06-3142-3732-7346-2543'
-    right = '3000-6F06-3142-3732-4454-2543'
-    smcpath = '/root/pololu/smc_linux/SmcCmd'
+def main():
+    driverlist = {
+            'smccmd':('Runs SmcCmd to process every request', drivers.smccmd),
+            'smcserial':('Drives controllers using the serial protocol via a tty interface', drivers.smcserial),
+            'smcstub':('Stub test driver for SMC controller-based drivers', drivers.smcstub),
+            }
 
-    if len(sys.argv) > 1 and sys.argv[1] == 'stub':
-        driver = drivers.smcstub.get_driver(left, right)
-    else:
-        driver = drivers.smcserial.get_driver(left, right, smcpath)
+    parser = OptionParser()
+    parser.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=driverlist.keys(),
+            help="Drive using this driver [Default: smcserial]")
+    parser.add_option('-a', '--host', action="store", type="string", dest="host", default="",
+            help="Host/address to listen on [Default: all (empty string)]")
+    parser.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
+            help="Port to listen on [Default: 9999]")
 
-    # Create the server, binding to localhost on port 9999
-    server = TCPServer((HOST, PORT), DriverHandler)
+    parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
+            help="Print more debug info")
+
+    parser.add_option("--list", action="store_true", dest="list", default=False,
+            help="List the available drivers")
+
+    smcgroup = OptionGroup(parser, "SMC-based driver options",
+        "Needed when the driver is oriented around a pair of Pololu Simple Motor Controllers")
+    smcgroup.add_option("-l", "--left", type="string", dest="left", default='3000-6A06-3142-3732-7346-2543',
+            help="The serial number of the left controller [3000-6A06-3142-3732-7346-2543]")
+    smcgroup.add_option("-r", "--right", type="string", dest="right", default="3000-6F06-3142-3732-4454-2543",
+            help="The serial number of the right controller [3000-6F06-3142-3732-4454-2543]")
+    smcgroup.add_option("-c", "--smccmd", type="string", dest="smccmd", default="/root/pololu/smc_linux/SmcCmd",
+            help="The path to the SmcCmd utility [/root/pololu/smc_linux/SmcCmd]")
+    parser.add_option_group(smcgroup)
+
+    options, args = parser.parse_args()
+    if options.list:
+        for name, info in driverlist.items():
+            print "%s %s" % (name.ljustify(30), info[0])
+
+        return 0
+
+    try:
+        drivermod = driverlist[options.driver][1]
+    except:
+        parser.error("You must specify a driver")
+
+    driver = drivermod.get_driver(**vars(options))
+    server = TCPServer((options.host, options.port), DriverHandler)
     server.driver = driver
 
-    # Activate the server; this will keep running until you
-    # interrupt the program with Ctrl-C
     try:
-        server.serve_forever()
-    except KeyboardInterrupt, e:
-        print 'Shutting down.'
+        server.server_forever()
+    except:
+        print "Shutting down"
         server.server_close()
+    finally:
+        driver.stop()
+
+if __name__ == "__main__":
+    main()
