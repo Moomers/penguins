@@ -4,6 +4,9 @@ import commands
 import os, os.path
 import serial
 import tempfile
+import time
+import traceback
+
 from xml.etree import ElementTree
 
 import common
@@ -15,6 +18,7 @@ class SimpleMotorController(object):
 
         Will fail if the device at the port is not an SMC"""
         #make sure our port looks right
+        self.port = port
         if not port.startswith('/dev/ttyACM'):
             raise ValueError("Invalid port '%s': should be '/dev/ttyACM<#>'" % port)
         if not os.path.exists(port):
@@ -26,6 +30,9 @@ class SimpleMotorController(object):
         #make sure we're in ascii mode
         self.smccmd = smccmd
         self._ensure_ascii_mode()
+
+        #some global vars
+        self.reset_count = 0
 
         #open the serial connection
         self.dev = serial.Serial(port, timeout = 1)
@@ -79,14 +86,32 @@ class SimpleMotorController(object):
         command = command.strip()
         if '\r' in command or '\n' in command or chr(0) in command:
             raise ValueError("Invalid command '%s': commands cannot contain '\\r', '\\n' or NULL" % command)
+        if not command:
+            raise ValueError("Invalid command '%s': it's blank!" % command)
 
         #send the command
-        self.dev.write(command)
-        self.dev.write('\n')
-        self.dev.flush()
+        while True:
+           try:
+              self.dev.write(command)
+              self.dev.write('\n')
 
-        #get and parse the result
-        result = self.dev.readline()
+              #get and parse the result
+              result = self.dev.readline().strip()
+              if not result:
+                 raise common.ControllerError("result was empty")
+
+           except common.ControllerError:
+              print "*** Got an empty response, trying command %s again ***" % command
+
+           except:
+              print "*** Error on sending command '%s' ***" % command
+              traceback.print_exc()
+
+              time.sleep(.2)
+              self.reset()
+              self.reset_count += 1
+           else:
+              break
 
         status = result[0]
         if status == '?':
@@ -130,6 +155,8 @@ class SimpleMotorController(object):
         #are we having any errors atm?
         status['errors'] = self._bit_query(common.ControllerError.STATUS, self._get_variable(0))
         status['speed'] = self.speed
+        status['reset_count'] = self.reset_count
+
         return status
 
     def reset(self):
@@ -184,7 +211,10 @@ def get_driver(left_id, right_id, smccmd):
             continue
 
         port = os.path.join('/dev', f)
-        serial = get_serial_by_port(port)
+        try:
+           serial = get_serial_by_port(port)
+        except:
+           continue
 
         for c in controllers.values():
             if c['serial'] == serial:
@@ -194,6 +224,9 @@ def get_driver(left_id, right_id, smccmd):
     for side, c in controllers.items():
         if not c['controller']:
             raise common.DriverError("Cannot find controller with serial number %s (%s side)" % (c['serial'], side))
+        else:
+            print "Found %s controller on port %s" % (side, c['controller'].port)
+
 
     #return the driver using the two controllers we found
     return common.SmcDriver(controllers['left']['controller'], controllers['right']['controller'])
