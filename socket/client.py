@@ -85,16 +85,17 @@ def main():
     parser = OptionParser()
     parser.add_option('-i', '--ui', action="store", type="choice", dest="ui", default="curses", choices=uilist.keys(),
             help="Start up this UI [Default: curses]")
-    parser.add_option('-a', '--host', action="store", type="string", dest="host", default="localhost",
-            help="Host/address to connect to [Default: localhost]")
-    parser.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
-            help="Port the server is listening on [Default: 9999]")
-
     parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
             help="Print more debug info")
-
     parser.add_option("--list", action="store_true", dest="list", default=False,
             help="List the available UIs")
+
+    netgroup = OptionGroup(parser, "Network options")
+    netgroup.add_option('-a', '--host', action="store", type="string", dest="host", default="localhost",
+            help="Host/address to connect to [Default: localhost]")
+    netgroup.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
+            help="Port the server is listening on [Default: 9999]")
+    parser.add_option_group(netgroup)
 
 
     options, args = parser.parse_args()
