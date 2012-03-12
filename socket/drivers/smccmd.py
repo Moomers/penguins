@@ -17,11 +17,7 @@ class SmcCmdDriver(object):
                 }
 
         self.smccmd = smccmd_path
-
-        #make sure the controller is ready to run
-        self.set_speed(0)
-        for motor in self.motors.keys():
-            self._run_smc_command('--resume', motor)
+        self.reset()
 
     def _run_smc_command(self, command, motor):
         """Runs the specified command on the given motor"""
@@ -97,3 +93,15 @@ class SmcCmdDriver(object):
 
     def stop(self):
         self.brake(100)
+
+    def reset(self):
+        self.set_speed(0)
+        for motor in self.motors.keys():
+            self._run_smc_command('--resume', motor)
+
+    @property
+    def status(self):
+        return {'does ths do anything?':False}
+
+def get_driver(left, right, smccmd, **rest):
+    return SmcCmdDriver(left, right, smccmd)
