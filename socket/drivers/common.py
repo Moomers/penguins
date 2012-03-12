@@ -80,7 +80,10 @@ class SmcDriver(object):
         for c in self.controllers.values():
             c.stop()
 
+    @property
     def status(self):
         status = {}
         for side, c in self.controllers.items():
-            status[side] = c.status()
+            status[side] = c.status
+
+        return status
