@@ -108,16 +108,18 @@ def main():
     parser = OptionParser()
     parser.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=driverlist.keys(),
             help="Drive using this driver [Default: smcserial]")
-    parser.add_option('-a', '--host', action="store", type="string", dest="host", default="",
-            help="Host/address to listen on [Default: all (empty string)]")
-    parser.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
-            help="Port to listen on [Default: 9999]")
-
     parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
             help="Print more debug info")
-
     parser.add_option("--list", action="store_true", dest="list", default=False,
             help="List the available drivers")
+
+    netgroup = OptionGroup(parser, "Network options")
+    netgroup.add_option('-a', '--host', action="store", type="string", dest="host", default="",
+            help="Host/address to listen on [Default: all (empty string)]")
+    netgroup.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
+            help="Port to listen on [Default: 9999]")
+    parser.add_option_group(netgroup)
+
 
     smcgroup = OptionGroup(parser, "SMC-based driver options",
         "Needed when the driver is oriented around a pair of Pololu Simple Motor Controllers")
@@ -131,8 +133,9 @@ def main():
 
     options, args = parser.parse_args()
     if options.list:
+        print "Available drivers:"
         for name, info in driverlist.items():
-            print "%s %s" % (name.ljustify(30), info[0])
+            print "%s %s" % (name.ljust(30), info[0])
 
         return 0
 
