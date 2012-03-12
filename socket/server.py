@@ -24,6 +24,13 @@ class DriverHandler(SocketServer.StreamRequestHandler):
         else:
             return int(new_speed)
 
+    def send_output(self, result, output):
+        """Sends the output of the request to the client"""
+        data = pickle.dumps((result, output))
+        self.wfile.write('%d\n' % len(data))
+        self.wfile.write(data)
+        self.wfile.flush()
+
     def handle(self):
         """writes requests from the client into a queue"""
         while True:
@@ -58,7 +65,7 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     output = 'braking initiated'
 
                 elif parts[0] == 'status':
-                    output = driver.status()
+                    output = driver.status
 
                 elif parts[0] in ('speed', 'left', 'right'):
                     #try to get a number out of parts[1]
@@ -83,15 +90,12 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     raise CommandError("invalid command '%s'" % command)
 
             except CommandError, e:
-                self.wfile.write("invalid, %s\n" % pickle.dumps(e.message))
+                self.send_output('invalid', e.message)
             except Exception, e:
                 traceback.print_exc()
-                self.wfile.write("error, %s\n" % pickle.dumps(str(e)))
+                self.send_output('error', str(e))
             else:
-                self.wfile.write("ok, %s\n" % pickle.dumps(output))
-            finally:
-                self.wfile.flush()
-
+                self.send_output('ok', output)
 
 if __name__ == "__main__":
     HOST, PORT = '', 9999
