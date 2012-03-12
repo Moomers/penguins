@@ -120,6 +120,17 @@ class CursesUI(object):
             elif c == curses.KEY_UP:
                 self.write_result('Moving at speed: %s' % BASE_SPEED)
                 self.client.set_speed(BASE_SPEED)
+            elif c == curses.KEY_LEFT:
+                self.write_result('Turning left at speed: %s' % BASE_SPEED)
+                self.client.left = -BASE_SPEED
+                self.client.right = BASE_SPEED
+            elif c == curses.KEY_RIGHT:
+                self.write_result('Turning right at speed: %s' % BASE_SPEED)
+                self.client.left = BASE_SPEED
+                self.client.right = -BASE_SPEED
+            elif c == curses.KEY_DOWN:
+                self.write_result('Moving at speed: %s' % BASE_SPEED)
+                self.client.set_speed(-BASE_SPEED)
             elif c == -1:
                 self.client.stop()
                 self.write_result('stopped.')
