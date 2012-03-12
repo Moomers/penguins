@@ -2,6 +2,7 @@
 
 import SocketServer
 import drivers, drivers.smcserial, drivers.smcstub
+import cPickle as pickle
 import sys
 import traceback
 
@@ -56,6 +57,9 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     driver.brake(new_speed)
                     output = 'braking initiated'
 
+                elif parts[0] == 'status':
+                    output = driver.status()
+
                 elif parts[0] in ('speed', 'left', 'right'):
                     #try to get a number out of parts[1]
                     try:
@@ -79,15 +83,15 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     raise CommandError("invalid command '%s'" % command)
 
             except CommandError, e:
-                self.wfile.write("invalid, %s\n" % e.message)
-                self.wfile.flush()
+                self.wfile.write("invalid, %s\n" % pickle.dumps(e.message))
             except Exception, e:
                 traceback.print_exc()
-                self.wfile.write("error, command %s - %s\n" % (command, str(e)))
-                self.wfile.flush()
+                self.wfile.write("error, %s\n" % pickle.dumps(str(e)))
             else:
-                self.wfile.write("ok, %s\n" % output)
+                self.wfile.write("ok, %s\n" % pickle.dumps(output))
+            finally:
                 self.wfile.flush()
+
 
 if __name__ == "__main__":
     HOST, PORT = '', 9999
