@@ -36,6 +36,7 @@ class SMCStubController(object):
 
     def stop(self):
         print '%s: stop()' % self._port
+        self._safe = True
         self.speed = 0
 
     def brake(self, accel):
