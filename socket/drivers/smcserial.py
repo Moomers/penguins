@@ -40,7 +40,7 @@ class SimpleMotorController(object):
         """Makes sure the controller is set into ascii mode using SmcCmd"""
         fd, temp_name = tempfile.mkstemp()
         try:
-            conffile = os.fdopen(fd, 'rw')
+            conffile = os.fdopen(fd, 'r+')
         except:
             os.close(fd)
             raise
@@ -60,9 +60,12 @@ class SimpleMotorController(object):
                     conf.find('SerialMode').text = 'Ascii'
                     conffile.seek(0)
                     conffile.truncate()
-                    conffile.write(ElementTree.tostring(conf))
 
-                    status, output = commands.getstatusoutput("%s -d %s --configure %s" % (self.smccmd, self.serial, temp_name))
+                    conffile.write(ElementTree.tostring(conf))
+                    conffile.flush()
+
+                    command = "%s -d %s --configure %s" % (self.smccmd, self.serial, temp_name)
+                    status, output = commands.getstatusoutput(command)
                     if status:
                         raise common.ControllerError("Cannot set serial mode to Ascii on controller %s: %s" % (self.serial, output))
             finally:
@@ -88,7 +91,7 @@ class SimpleMotorController(object):
         status = result[0]
         if status == '?':
             raise ValueError("Command '%s' was not understood" % command)
-        elif status not in ('?','!'):
+        elif status not in ('.','!'):
             raise common.ControllerError("Invalid output from controller: '%s'" % result)
 
         #return a tuple containing (status, output)
@@ -151,7 +154,7 @@ class SimpleMotorController(object):
     def set_speed(self, speed):
         """Sets the current speed"""
         cmd = 'R' if speed < 0 else 'F'
-        self._send_comand("%s%d" % (cmd, abs(speed)))
+        self._send_command("%s%d" % (cmd, abs(speed)))
 
     speed = property(
             lambda self: self.get_speed(),
