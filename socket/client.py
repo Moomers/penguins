@@ -16,13 +16,15 @@ class DriverClient(object):
         self.server.write(command)
         self.server.flush()
 
-        result = self.server.readline().split(',', 1)
-        output = pickle.loads(result[1].strip())
+        #read the length of the result
+        length = int(self.server.readline())
+        output = self.server.read(length)
 
+        result = pickle.loads(output)
         if result[0] == 'ok':
-            return output
+            return result[1]
         else:
-            raise output
+            raise result[1]
 
     ###### the interface of the driver #####
     def brake(self, speed):
@@ -30,6 +32,10 @@ class DriverClient(object):
 
     def stop(self):
         return self._send_command("stop")
+
+    @property
+    def status(self):
+        return self._send_command('status')
 
     def set_speed(self, speed, motor = 'both'):
         """sets the speed of one or both motors"""
@@ -50,10 +56,6 @@ class DriverClient(object):
         else:
             speed = self._send_command(motor)
             return [int(speed.strip())]
-
-    @property
-    def status(self):
-        return self._send_comand('status')
 
     speed = property(
             lambda self: self.get_speed('both'),
