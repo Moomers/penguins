@@ -36,14 +36,13 @@ class DriverHandler(SocketServer.StreamRequestHandler):
         """writes requests from the client into a queue"""
         while True:
             command = self.rfile.readline().strip()
+
             if not command:
-                self.wfile.write("\n")
-                self.wfile.flush()
+                self.send_output('ok', '')
                 continue
 
             if command == 'exit':
-                self.wfile.write("done\n")
-                self.wfile.flush()
+                self.send_output('ok', 'done')
                 break
 
             try:
@@ -69,7 +68,8 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     output = driver.status
 
                 elif parts[0] == 'reset':
-                    output = driver.reset
+                    driver.reset()
+                    output = "driver reset successful"
 
                 elif parts[0] in ('speed', 'left', 'right'):
                     #try to get a number out of parts[1]

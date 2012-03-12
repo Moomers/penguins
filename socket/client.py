@@ -32,6 +32,7 @@ class DriverClient(object):
     def disconnect(self):
         """Stops the motors and disconnects from the server"""
         self.stop()
+        self._send_command('exit')
         self.sock.close()
 
     ###### the interface of the driver #####
@@ -42,7 +43,7 @@ class DriverClient(object):
         return self._send_command("stop")
 
     def reset(self):
-        return self_send_command('reset')
+        return self._send_command('reset')
 
     @property
     def status(self):
