@@ -3,8 +3,8 @@
 import curses
 import time
 
-BASE_SPEED = 50
-TURN_SPEED = 40
+BASE_SPEED = 10
+TURN_SPEED = 15
 
 class CursesUI(object):
     """A curses UI or talking to a driver via client"""

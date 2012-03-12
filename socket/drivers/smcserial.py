@@ -200,8 +200,8 @@ def get_serial_by_port(port):
 def get_driver(left, right, smccmd, **rest):
     """Utility function which returns a driver using the controllers defined here"""
     controllers = {
-            'left':{'serial':left_id, 'controller':None},
-            'right':{'serial':right_id, 'controller':None},
+            'left':{'serial':left, 'controller':None},
+            'right':{'serial':right, 'controller':None},
             }
 
     #look through ttyACM devices to find one with a matching serial number
