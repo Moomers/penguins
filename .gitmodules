@@ -1,0 +1,9 @@
+[submodule "minIMU-9/AHRS"]
+	path = minIMU-9/AHRS
+	url = https://github.com/pololu/MinIMU-9-Arduino-AHRS
+[submodule "minIMU-9/L3G4200D"]
+	path = minIMU-9/L3G4200D
+	url = https://github.com/pololu/L3G4200D
+[submodule "minIMU-9/LSM303"]
+	path = minIMU-9/LSM303
+	url = https://github.com/pololu/LSM303
