@@ -7,3 +7,6 @@
 [submodule "minIMU-9/LSM303"]
 	path = minIMU-9/LSM303
 	url = https://github.com/pololu/LSM303
+[submodule "controller/arduino-cmake"]
+	path = controller/arduino-cmake
+	url = https://github.com/queezythegreat/arduino-cmake.git
