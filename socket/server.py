@@ -106,15 +106,21 @@ def main():
             'smccmd':('Runs SmcCmd to process every request', drivers.smccmd),
             'smcserial':('Drives controllers using the serial protocol via a tty interface', drivers.smcserial),
             'smcstub':('Stub test driver for SMC controller-based drivers', drivers.smcstub),
+            'sabertooth':('Talks to the Sabertooth 2x60 via the on-board arduino', drivers.sabertooth),
             }
 
     parser = OptionParser()
-    parser.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=driverlist.keys(),
-            help="Drive using this driver [Default: smcserial]")
     parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
             help="Print more debug info")
     parser.add_option("--list", action="store_true", dest="list", default=False,
             help="List the available drivers")
+
+    opgroup = OptionGroup(parser, "Operational options")
+    opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=driverlist.keys(),
+            help="Drive using this driver [Default: smcserial]")
+    opgroup.add_option('-o', '--arduino', action="store", type="string", dest="arduino_port", default=None,
+            help="Port of the on-board Arduino [Default: None (no arduino)]")
+    parser.add_option_group(opgroup)
 
     netgroup = OptionGroup(parser, "Network options")
     netgroup.add_option('-a', '--host', action="store", type="string", dest="host", default="",
@@ -122,7 +128,6 @@ def main():
     netgroup.add_option('-p', '--port', action="store", type="int", dest="port", default=9999,
             help="Port to listen on [Default: 9999]")
     parser.add_option_group(netgroup)
-
 
     smcgroup = OptionGroup(parser, "SMC-based driver options",
         "Needed when the driver is oriented around a pair of Pololu Simple Motor Controllers")
@@ -134,6 +139,7 @@ def main():
             help="The path to the SmcCmd utility [/root/pololu/smc_linux/SmcCmd]")
     parser.add_option_group(smcgroup)
 
+    # parse the arguments
     options, args = parser.parse_args()
     if options.list:
         print "Available drivers:"
@@ -142,13 +148,23 @@ def main():
 
         return 0
 
+    # start talking to the onboard arduino
+    onboard_arduino = None
+    if options.arduino_port:
+        import arduino
+        onboard_arduino = arduino.Arduino(options.arduino_port)
+
+    # get the driver
     try:
         drivermod = driverlist[options.driver][1]
     except:
         parser.error("You must specify a driver")
+    else:
+        driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
 
-    driver = drivermod.get_driver(**vars(options))
+    # start the server
     server = TCPServer((options.host, options.port), DriverHandler)
+    server.arduino = onboard_arduino
     server.driver = driver
 
     try:
@@ -159,6 +175,8 @@ def main():
         print "Shutting down"
         server.server_close()
         driver.stop()
+        if onboard_arduino:
+            onboard_arduino.stop()
 
 if __name__ == "__main__":
     main()
