@@ -1,0 +1,12 @@
+This section is designed to be built using arduino-cmake from:
+https://github.com/queezythegreat/arduino-cmake#using-arduino-cmake
+
+You'll need to install the Arduino SDK, cmake, and assorted development tools (gcc, avrdude). Follow
+the instructions in the arduino-cmake readme for more info, but a quick primer is:
+
+mkdir build
+cd build 
+cmake ..
+make
+
+To upload to your arduino, you'll need to specify the serial port on the command line.
