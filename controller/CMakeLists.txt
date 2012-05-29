@@ -14,6 +14,7 @@ set(PROJECT_NAME controller)
 project(${PROJECT_NAME} C CXX)
 
 generate_arduino_firmware(${PROJECT_NAME}
-        SKETCH .
+        SRCS controller.cpp
+        HDRS controller.h
         BOARD uno)
 
