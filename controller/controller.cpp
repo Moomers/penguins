@@ -42,10 +42,7 @@ void setup()
 {
   // initialize the serial communication with the server
   Serial.begin(9600);
-  Serial.println("reset");  // Tell the server we reset.
-
-  // ms to wait for an entire command.
-  Serial.setTimeout(1000);
+  Serial.println("R");  // Tell the server we reset.
 }
 
 void loop()
@@ -70,11 +67,17 @@ void loop()
     // log receiving bad commands
     if (cmd.type == SerialCommand::BAD) {
       state.badCommandsReceived++;
-    } else if (cmd.type == SerialCommand::REFRESH) {
+    }
+
+  // got a good command from the server; log and execute
+  } else {
+    state.loopsSinceLastCommand = 0;
+    state.commandsReceived++;
+
+    if (cmd.type == SerialCommand::REFRESH) {
       state.loopsSinceStateSent = LoopsBetweenStateSend;
     }
   }
-  // execute server's commands
 }
 
 void send_state()
@@ -94,7 +97,7 @@ void send_state()
 
   Serial.print("L:");
   Serial.print(state.loopsSinceLastCommand, DEC);
-  Serial.print("\n");
+  Serial.print("\r\n");
   state.loopsSinceStateSent = 0;
 }
 
@@ -125,7 +128,7 @@ SerialCommand read_server_command()
   }
 
   // we read a full command from the serial port
-  if (buf[buf_pos] == '\n') {
+  if (buf[buf_pos - 1] == '\n') {
     SerialCommand cmd;
     if (buffer_overflow) {
       cmd = SerialCommand(SerialCommand::BAD);
