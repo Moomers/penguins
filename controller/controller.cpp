@@ -2,17 +2,23 @@
 // (c) Moomers, Inc. 2012
 
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 
 const unsigned long MaxLoopsSinceCommand = 10000;  // TODO: 1 second.
 const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
+
+// Note that the Sabertooth serial interface is unidirectional, so only TX
+// is really needed here.
+SoftwareSerial sabertoothSerial(10, 11);  // RX, TX for talking to Sabertooth
 
 struct SerialCommand {
   enum Type {
     BAD = -1,
     NONE = 0,
     HEARTBEAT = 1,
-    MOVE = 2,
-    REFRESH = 3,
+    VELOCITY = 2,
+    RESET = 3,
+    GETSTATE = 4,
   };
   SerialCommand() : type(BAD), leftVelocity(0), rightVelocity(0) { }
   SerialCommand(Type t) : type(t), leftVelocity(0), rightVelocity(0) { }
@@ -25,24 +31,32 @@ static struct State {
   State() : badCommandsReceived(0),
     commandsReceived(0),
     loopsSinceLastCommand(0),
-    loopsSinceStateSent(0) { }
+    loopsSinceStateSent(0),
+    emergencyStop(false) { }
   unsigned long badCommandsReceived;
   unsigned long commandsReceived;
   unsigned long loopsSinceLastCommand;
   unsigned long loopsSinceStateSent;
+  bool emergencyStop;
 } state;
 
 const char* scan_int(const char* buf, int* value);
 SerialCommand parse_command_buffer(const char* buf, int len);
 SerialCommand read_server_command();
+void execute_command(const SerialCommand& cmd);
 void emergency_stop();
 void send_state();
+void send_velocity_to_sabertooth(int left, int right);
 
 void setup()
 {
   // initialize the serial communication with the server
   Serial.begin(9600);
   Serial.println("R");  // Tell the server we reset.
+
+  // initialize communication with the sabertooth motor controller
+  sabertoothSerial.begin(19200);
+  sabertoothSerial.write(uint8_t(0));
 }
 
 void loop()
@@ -73,10 +87,48 @@ void loop()
   } else {
     state.loopsSinceLastCommand = 0;
     state.commandsReceived++;
+    execute_command(cmd);
+  }
+}
 
-    if (cmd.type == SerialCommand::REFRESH) {
-      state.loopsSinceStateSent = LoopsBetweenStateSend;
-    }
+void execute_command(const SerialCommand& cmd)
+{
+  if (cmd.type == SerialCommand::GETSTATE) {
+    state.loopsSinceStateSent = LoopsBetweenStateSend;
+  }
+
+  if (cmd.type == SerialCommand::RESET) {
+    state.emergencyStop = false;
+  }
+
+  if (cmd.type == SerialCommand::VELOCITY) {
+    send_velocity_to_sabertooth(cmd.leftVelocity, cmd.rightVelocity);
+  }
+}
+
+inline int clamp(int value, int min, int max)
+{
+  if (value < min) {
+    return min;
+  } else if (value > max) {
+    return max;
+  }
+  return value;
+}
+
+void send_velocity_to_sabertooth(int left, int right)
+{
+  left = clamp(left, -63, 63);
+  right = clamp(right, -63, 63);
+  if (state.emergencyStop) {
+    left = 0;
+    right = 0;
+  }
+  if (left == 0 && right == 0) {
+    sabertoothSerial.write(uint8_t(0));
+  } else {
+    sabertoothSerial.write(uint8_t(64 + left));
+    sabertoothSerial.write(uint8_t(192 + right));
   }
 }
 
@@ -97,6 +149,10 @@ void send_state()
 
   Serial.print("L:");
   Serial.print(state.loopsSinceLastCommand, DEC);
+  Serial.print(",");
+
+  Serial.print("E:");
+  Serial.print(state.emergencyStop, DEC);
   Serial.print("\r\n");
   state.loopsSinceStateSent = 0;
 }
@@ -153,9 +209,10 @@ SerialCommand read_server_command()
 SerialCommand parse_command_buffer(const char* buf, int len)
 {
   // Protocol from the server:
-  // V<left>,<right>\n  -- set motor velocities, int in [-100, 100]
-  // H\n                 -- heartbeat
-  // R\n
+  // V<left>,<right>\n  -- set motor velocities, int in [-63, 63]
+  // H\n                -- heartbeat
+  // S\n                -- causes an immediate send of the current state
+  // R\n                -- reset (used when emegency stop is set)
 
   SerialCommand cmd;
   switch (buf[0]) {
@@ -163,10 +220,13 @@ SerialCommand parse_command_buffer(const char* buf, int len)
     cmd.type = SerialCommand::HEARTBEAT;
     break;
   case 'R':
-    cmd.type = SerialCommand::REFRESH;
+    cmd.type = SerialCommand::RESET;
+    break;
+  case 'S':
+    cmd.type = SerialCommand::GETSTATE;
     break;
   case 'V':
-    cmd.type = SerialCommand::MOVE;
+    cmd.type = SerialCommand::VELOCITY;
     buf = scan_int(buf+1, &cmd.leftVelocity);
     if (*buf != ',') {
       cmd.type = SerialCommand::BAD;
@@ -209,4 +269,6 @@ const char* scan_int(const char* buf, int *value)
 
 void emergency_stop() 
 {
+  state.emergencyStop = true;
+  send_velocity_to_sabertooth(0,0);
 }
