@@ -128,7 +128,7 @@ SerialCommand read_server_command()
   }
 
   // we read a full command from the serial port
-  if (buf[buf_pos - 1] == '\n') {
+  if (buf[buf_pos] == '\n') {
     SerialCommand cmd;
     if (buffer_overflow) {
       cmd = SerialCommand(SerialCommand::BAD);
@@ -138,6 +138,10 @@ SerialCommand read_server_command()
 
     buf_pos = 0;
     buffer_overflow = false;
+    for (int i = 0; i < sizeof(buf); i++) {
+        buf[i] = 0;
+    }
+
     return cmd;
 
   // haven't read a full command yet; lets return no command
@@ -194,7 +198,7 @@ const char* scan_int(const char* buf, int *value)
 
   // parse the value -- works as long as we encounter valid numbers
   while (*buf >= '0' && *buf <= '9') {
-    *value += (10 * (*value)) + (*buf - '0');
+    *value = (10 * (*value)) + (*buf - '0');
     buf++;
   }
 
