@@ -75,7 +75,8 @@ void loop()
 
     // if too long since server sent something, stop
     if (state.loopsSinceLastCommand > MaxLoopsSinceCommand) {
-      emergency_stop();
+      if (!state.emergencyStop)
+          emergency_stop();
     }
 
     // log receiving bad commands
