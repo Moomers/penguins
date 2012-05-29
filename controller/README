@@ -1,7 +1,12 @@
 This section is designed to be built using arduino-cmake from:
 https://github.com/queezythegreat/arduino-cmake#using-arduino-cmake
 
-You'll need to install the Arduino SDK, cmake, and assorted development tools (gcc, avrdude). Follow
+This has been added as a submodule to this project; you can get it by running:
+git submodule update --init controller/arduino-cmake
+
+from the root of your git clone.
+
+You'll also need to install the Arduino SDK, cmake, and assorted development tools (gcc, avrdude). Follow
 the instructions in the arduino-cmake readme for more info, but a quick primer is:
 
 mkdir build
