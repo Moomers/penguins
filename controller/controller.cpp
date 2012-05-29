@@ -19,6 +19,7 @@ struct SerialCommand {
     VELOCITY = 2,
     RESET = 3,
     GETSTATE = 4,
+    STOP = 5,
   };
   SerialCommand() : type(BAD), leftVelocity(0), rightVelocity(0) { }
   SerialCommand(Type t) : type(t), leftVelocity(0), rightVelocity(0) { }
@@ -104,6 +105,11 @@ void execute_command(const SerialCommand& cmd)
 
   if (cmd.type == SerialCommand::VELOCITY) {
     send_velocity_to_sabertooth(cmd.leftVelocity, cmd.rightVelocity);
+  }
+
+  if (cmd.type == SerialCommand::STOP) {
+    state.emergencyStop = true;
+    send_velocity_to_sabertooth(0, 0);
   }
 }
 
@@ -213,7 +219,8 @@ SerialCommand parse_command_buffer(const char* buf, int len)
   // V<left>,<right>\n  -- set motor velocities, int in [-63, 63]
   // H\n                -- heartbeat
   // S\n                -- causes an immediate send of the current state
-  // R\n                -- reset (used when emegency stop is set)
+  // R\n                -- reset (clears an emergency stop)
+  // X\n                -- stop (causes an emergency stop to occur)
 
   SerialCommand cmd;
   switch (buf[0]) {
@@ -225,6 +232,9 @@ SerialCommand parse_command_buffer(const char* buf, int len)
     break;
   case 'S':
     cmd.type = SerialCommand::GETSTATE;
+    break;
+  case 'X':
+    cmd.type = SerialCommand::STOP;
     break;
   case 'V':
     cmd.type = SerialCommand::VELOCITY;
