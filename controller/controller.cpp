@@ -212,8 +212,6 @@ void send_state()
   if (state.loopsSinceStateSent++ < LoopsBetweenStateSend) {
     return;
   }
-  Serial.print("State!");
-
   Serial.print("C:");
   Serial.print(state.commandsReceived, DEC);
   Serial.print(";");
@@ -230,7 +228,7 @@ void send_state()
   Serial.print(state.emergencyStop, DEC);
   Serial.print(";");
 
-  Serial.print("Sensors!");
+  Serial.print("!");
   for(unsigned int i = 0; i < NumSensors; i++) {
     if (!sensors[i])
       continue;
