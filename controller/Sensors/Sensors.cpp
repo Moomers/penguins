@@ -3,11 +3,11 @@
 // Potentiometer: Similar to Potentiometer arduino library by Alexander Brevig
 // Pushbutton: original code by Igor Serebryany
 // Sonar: uses the MaxSonar device, code borrowed from Bruce Allen
-// Gyro: ??
-// Magnetometer/Accelerometer: ??
+// Gyro/Magnetometer/Accelerometer: on the L3G4200D carrier; code borrowed from Popolu Corporation
 
 #include <Arduino.h>
 #include <stdio.h>
+
 #include "Sensors.h"
 
 Sensor::Sensor(const char *sensor_prefix)
@@ -63,3 +63,46 @@ char *Sonar::get_data() {
   sprintf(buf, "%s:%d", prefix_, last_value_);
   return buf;
 }
+
+// *** Accelerometer/Magnetometer/Gyro
+#if defined(USE_AMG)
+
+AMG::AMG(const char *sensor_prefix)
+  : Sensor(sensor_prefix),
+    initialized_(0) {
+}
+
+void AMG::init() {
+  gyro_.enableDefault();
+  compass_.init();
+  compass_.enableDefault();
+}
+
+AMG::~AMG() {
+}
+
+void AMG::read() {
+  if (!initialized_)
+    init();
+
+  compass_.read();
+  a_.x = compass_.a.x;
+  a_.y = compass_.a.y;
+  a_.z = compass_.a.z;
+
+  m_.x = compass_.m.x;
+  m_.y = compass_.m.y;
+  m_.z = compass_.m.z;
+
+  gyro_.read();
+  g_.x = gyro_.g.x;
+  g_.y = gyro_.g.y;
+  g_.z = gyro_.g.z;
+}
+
+char *AMG::get_data() {
+  static char buf[60];
+  sprintf(buf, "%s:%d,%d,%d,%d,%d,%d,%d,%d,%d", prefix_, (int)a_.x, (int)a_.y, (int)a_.z, (int)m_.x, (int)m_.y, (int)m_.z, (int)g_.x, (int)g_.y, (int)g_.z);
+  return buf;
+}
+#endif

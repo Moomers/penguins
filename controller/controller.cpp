@@ -2,7 +2,10 @@
 // (c) Moomers, Inc. 2012
 
 #include <Arduino.h>
+#include <Wire.h>
 #include <SoftwareSerial.h>
+
+#include "config.h"
 #include "Sensors/Sensors.h"
 
 /*********** Pin Assignments ***********************/
@@ -49,11 +52,17 @@ SoftwareSerial sabertoothSerial(DriverRXPin, DriverTXPin);
 Potentiometer leftPot("LP", LeftPotPin);
 Potentiometer rightPot("RP", RightPotPin);
 Sonar leftSonar("LS", LeftSonarPWPin);
+#if defined(USE_AMG)
+AMG amg("AMG");
+#endif
 
 Sensor* sensors[] = {
   &leftPot,
   &rightPot,
-  &leftSonar
+  &leftSonar,
+#if defined(USE_AMG)
+  &amg,
+#endif
 };
 const unsigned int NumSensors = sizeof(sensors) / sizeof(sensors[0]);
 
@@ -106,6 +115,9 @@ void setup()
   // initialize the serial communication with the server
   Serial.begin(9600);
   Serial.println("R");  // Tell the server we reset.
+
+  // start the wire protocol
+  Wire.begin();
 
   // initialize communication with the sabertooth motor controller
   sabertoothSerial.begin(19200);
@@ -200,27 +212,32 @@ void send_state()
   if (state.loopsSinceStateSent++ < LoopsBetweenStateSend) {
     return;
   }
-  Serial.print("State: ");
+  Serial.print("State!");
 
   Serial.print("C:");
   Serial.print(state.commandsReceived, DEC);
-  Serial.print(",");
+  Serial.print(";");
 
   Serial.print("B:");
   Serial.print(state.badCommandsReceived, DEC);
-  Serial.print(",");
+  Serial.print(";");
 
   Serial.print("L:");
   Serial.print(state.loopsSinceLastCommand, DEC);
-  Serial.print(",");
+  Serial.print(";");
 
   Serial.print("E:");
   Serial.print(state.emergencyStop, DEC);
+  Serial.print(";");
 
-  Serial.print("Sensors: ");
+  Serial.print("Sensors!");
   for(unsigned int i = 0; i < NumSensors; i++) {
+    if (!sensors[i])
+      continue;
+
     sensors[i]->read();
     Serial.print(sensors[i]->get_data());
+    Serial.print(";");
   }
 
   Serial.print("\r\n");

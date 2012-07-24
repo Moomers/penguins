@@ -2,6 +2,7 @@
 #define Sensor_h
 
 #include <Arduino.h>
+#include "../config.h"
 
 // The interface that sensors implement.
 class Sensor
@@ -49,5 +50,38 @@ class Sonar : public Sensor
     const byte pin_;
     unsigned int last_value_;
 };
+
+#if defined(USE_AMG)
+#include "L3G4200D/L3G4200D.h"
+#include "LSM303/LSM303.h"
+
+class AMG : public Sensor
+{
+  public:
+    AMG(const char *sensor_prefix);
+
+    void init();
+    virtual ~AMG();
+
+    // Sensor interface
+    virtual void read();
+    virtual char *get_data();
+
+  private:
+    bool initialized_;
+
+    L3G4200D gyro_;
+    LSM303 compass_;
+
+    struct vector {
+      vector() : x(0), y(0), z(0) {}
+      float x, y, z;
+    };
+
+    vector a_;   //accelerometer
+    vector m_;   //magnetometer
+    vector g_;   //gyroscope
+};
+#endif
 
 #endif
