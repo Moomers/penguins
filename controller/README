@@ -14,4 +14,13 @@ cd build
 cmake ..
 make
 
-To upload to your arduino, you'll need to specify the serial port on the command line.
+To upload to your arduino, you'll need to update the PORT= line in CMakeLists.txt or pass a PORT= line
+on the command line, like so:
+
+make controller-upload PORT=/dev/ttyACM0
+
+To build with support for the AGM sensor, this code requires the LSM303 and L3G4200D libraries from Pololu; be
+sure to get them:
+
+git submodule update --init controller/minIMU-9/LSM303
+git submodule update --init controller/minIMU-9/L3G4200D
