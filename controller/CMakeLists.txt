@@ -14,7 +14,6 @@ set(PROJECT_NAME controller)
 project(${PROJECT_NAME} C CXX)
 
 generate_arduino_firmware(${PROJECT_NAME}
-        SRCS controller.cpp Sensors/Sensors.cpp
-        BOARD uno
-        PORT /dev/ttyACM0)
-
+  SRCS controller.cpp Sensors/Sensors.cpp Sensors/LSM303/LSM303.cpp Sensors/L3G4200D/L3G4200D.cpp
+  BOARD uno
+  PORT /dev/ttyACM0)
