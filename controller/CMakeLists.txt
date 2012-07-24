@@ -13,6 +13,8 @@ set(PROJECT_NAME controller)
 # Define your project and language
 project(${PROJECT_NAME} C CXX)
 
+include_directories(Sensors/LSM303 Sensors/L3G4200D)
+
 generate_arduino_firmware(${PROJECT_NAME}
   SRCS controller.cpp Sensors/Sensors.cpp Sensors/LSM303/LSM303.cpp Sensors/L3G4200D/L3G4200D.cpp
   BOARD uno
