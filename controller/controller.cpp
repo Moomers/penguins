@@ -23,13 +23,16 @@ const byte DriverTXPin = 11;
 const byte LeftPotPin = 0;
 const byte RightPotPin = 1;
 
+// for sensing the approximate voltage on the battery (analog pin)
+const byte BatteryVoltagePin = 2;
+
 // pushbuttons on controller
 const byte LeftButtonPin = 6;
 const byte RightButtonPin = 7;
 
 // motor speed (these pins can be interrupts)
-const byte LeftMotorSpeedPin = 2;
-const byte RightMotorSpeedPin = 3;
+const byte LeftEncoderPin = 2;
+const byte RightEncoderPin = 3;
 
 // sonar
 const byte LeftSonarPWPin = 4;
@@ -49,9 +52,18 @@ const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
 // Sabertooth serial interface is unidirectional, so only TX is really needed
 SoftwareSerial sabertoothSerial(DriverRXPin, DriverTXPin);
 
-Potentiometer leftPot("LP", LeftPotPin);
-Potentiometer rightPot("RP", RightPotPin);
+AnalogSensor leftPot("LP", LeftPotPin);
+AnalogSensor rightPot("RP", RightPotPin);
+AnalogSensor voltage("BV", BatteryVoltagePin);
+
+DigitalSensor leftButton("LB", LeftButtonPin);
+DigitalSensor rightButton("RB", RightButtonPin);
+
 Sonar leftSonar("LS", LeftSonarPWPin);
+//Sonar rightSonar("RS", RightSonarPWPin);
+Encoder leftEncoder("LE", LeftEncoderPin);
+Encoder rightEncoder("RE", RightEncoderPin);
+
 #if defined(USE_AMG)
 AMG amg("AMG");
 #endif
@@ -59,7 +71,15 @@ AMG amg("AMG");
 Sensor* sensors[] = {
   &leftPot,
   &rightPot,
+  &voltage,
+
+  &leftButton,
+  &rightButton,
+
   &leftSonar,
+//  &rightSonar,
+  &leftEncoder,
+  &rightEncoder,
 #if defined(USE_AMG)
   &amg,
 #endif
@@ -108,6 +128,8 @@ void execute_command(const SerialCommand& cmd);
 void emergency_stop();
 void send_state();
 void send_velocity_to_sabertooth(int left, int right);
+void left_encoder_interrupt();
+void right_encoder_interrupt();
 
 // begin code
 void setup()
@@ -122,6 +144,10 @@ void setup()
   // initialize communication with the sabertooth motor controller
   sabertoothSerial.begin(19200);
   sabertoothSerial.write(uint8_t(0));
+
+  // initialize the interrupts on encoders
+  attachInterrupt(LeftEncoderPin - 2, left_encoder_interrupt, RISING);
+  attachInterrupt(RightEncoderPin - 2, right_encoder_interrupt, RISING);
 }
 
 void loop()
@@ -155,6 +181,15 @@ void loop()
     state.commandsReceived++;
     execute_command(cmd);
   }
+}
+
+// interrupt functions for logging encoder events
+void left_encoder_interrupt() {
+  leftEncoder.log_rotation();
+}
+
+void right_encoder_interrupt() {
+  rightEncoder.log_rotation();
 }
 
 void read_sensor_state() {

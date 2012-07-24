@@ -21,11 +21,41 @@ class Sensor
     const char *prefix_;
 };
 
-class Potentiometer : public Sensor
+class AnalogSensor : public Sensor
 {
   public:
-    Potentiometer(const char *sensor_prefix, const byte potPin);
-    virtual ~Potentiometer();
+    AnalogSensor(const char *sensor_prefix, const byte sensorPin);
+    virtual ~AnalogSensor();
+
+    // Sensor interface:
+    virtual void read();
+    virtual char *get_data();
+
+  private:
+    const byte pin_;
+    unsigned int last_value_;
+};
+
+class DigitalSensor : public Sensor
+{
+  public:
+    DigitalSensor(const char *sensor_prefix, const byte sensorPin);
+    virtual ~DigitalSensor();
+
+    // Sensor interface:
+    virtual void read();
+    virtual char *get_data();
+
+  private:
+    const byte pin_;
+    bool last_value_;
+};
+
+class VoltageSensor : public Sensor
+{
+  public:
+    VoltageSensor(const char *sensor_prefix, const byte sensorPin);
+    virtual ~VoltageSensor();
 
     // Sensor interface:
     virtual void read();
@@ -51,6 +81,22 @@ class Sonar : public Sensor
     unsigned int last_value_;
 };
 
+class Encoder : public Sensor
+{
+  public:
+    Encoder(const char *sensor_prefix, const byte sensorPin);
+    virtual ~Encoder();
+
+    void log_rotation();
+
+    // sensor interface
+    virtual void read();
+    virtual char *get_data();
+  private:
+    const byte pin_;
+    unsigned long rotations_;
+};
+
 #if defined(USE_AMG)
 #include "L3G4200D/L3G4200D.h"
 #include "LSM303/LSM303.h"
@@ -59,9 +105,9 @@ class AMG : public Sensor
 {
   public:
     AMG(const char *sensor_prefix);
+    virtual ~AMG();
 
     void init();
-    virtual ~AMG();
 
     // Sensor interface
     virtual void read();

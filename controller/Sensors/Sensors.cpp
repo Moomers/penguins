@@ -17,22 +17,22 @@ Sensor::Sensor(const char *sensor_prefix)
 Sensor::~Sensor() {
 }
 
-// *** Potentiometer ***
-Potentiometer::Potentiometer(const char *sensor_prefix, const byte potPin)
+// *** an analog sensor ***
+AnalogSensor::AnalogSensor(const char *sensor_prefix, const byte sensorPin)
   : Sensor(sensor_prefix),
-    pin_(potPin),
+    pin_(sensorPin),
     //bigger than any possible value we can read
     last_value_(1025) {
 }
 
-Potentiometer::~Potentiometer() {
+AnalogSensor::~AnalogSensor() {
 }
 
-void Potentiometer::read() {
+void AnalogSensor::read() {
   last_value_ = analogRead(pin_);
 }
 
-char *Potentiometer::get_data() {
+char *AnalogSensor::get_data() {
   if (last_value_ > 1024) {
     return NULL;
   } else {
@@ -40,6 +40,29 @@ char *Potentiometer::get_data() {
     sprintf(buf, "%s:%d", prefix_, last_value_);
     return buf;
   }
+}
+
+// *** digital sensor ***
+DigitalSensor::DigitalSensor(const char *sensor_prefix, const byte sensorPin)
+  : Sensor(sensor_prefix),
+    pin_(sensorPin),
+    //bigger than any possible value we can read
+    last_value_(0) {
+  pinMode(pin_, INPUT);           // set pin to input
+  digitalWrite(pin_, HIGH);       // turn on pullup resistors
+}
+
+DigitalSensor::~DigitalSensor() {
+}
+
+void DigitalSensor::read() {
+  last_value_ = digitalRead(pin_);
+}
+
+char *DigitalSensor::get_data() {
+  static char buf[6];
+  sprintf(buf, "%s:%d", prefix_, last_value_);
+  return buf;
 }
 
 // *** Sonar ***
@@ -64,6 +87,33 @@ char *Sonar::get_data() {
   return buf;
 }
 
+// *** Pushbutton
+
+// *** Encoder
+Encoder::Encoder(const char *sensor_prefix, const byte sensorPin)
+  : Sensor(sensor_prefix),
+    pin_(sensorPin),
+    rotations_(0) {
+  pinMode(pin_, INPUT);           // set pin to input
+  digitalWrite(pin_, HIGH);       // turn on pullup resistors
+}
+
+Encoder::~Encoder() {
+}
+
+void Encoder::log_rotation() {
+  rotations_++;
+}
+
+void Encoder::read() {
+}
+
+char *Encoder::get_data() {
+  static char buf[10];
+  sprintf(buf, "%s:%d", prefix_, rotations_);
+  return buf;
+}
+
 // *** Accelerometer/Magnetometer/Gyro
 #if defined(USE_AMG)
 
@@ -72,13 +122,13 @@ AMG::AMG(const char *sensor_prefix)
     initialized_(0) {
 }
 
+AMG::~AMG() {
+}
+
 void AMG::init() {
   gyro_.enableDefault();
   compass_.init();
   compass_.enableDefault();
-}
-
-AMG::~AMG() {
 }
 
 void AMG::read() {
