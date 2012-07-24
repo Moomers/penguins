@@ -3,13 +3,58 @@
 
 #include <Arduino.h>
 #include <SoftwareSerial.h>
+#include "Sensors/Sensors.h"
+
+/*********** Pin Assignments ***********************/
+
+// these aren't used in the code, they're just here
+// as a reminder that those pins are not available
+const byte ServerRXPin = 0;
+const byte ServerTXPin = 1;
+
+// talking to the Sabertooth driver
+const byte DriverRXPin = 10;
+const byte DriverTXPin = 11;
+
+// reading the pot for steering (analog pins)
+const byte LeftPotPin = 0;
+const byte RightPotPin = 1;
+
+// pushbuttons on controller
+const byte LeftButtonPin = 6;
+const byte RightButtonPin = 7;
+
+// motor speed (these pins can be interrupts)
+const byte LeftMotorSpeedPin = 2;
+const byte RightMotorSpeedPin = 3;
+
+// sonar
+const byte LeftSonarPWPin = 4;
+const byte rightSonarPWPin = 5;
+
+// magnetometer/accelerometer LSM303 (analog pins)
+const byte LSM303SDAPin = 4;
+const byte LSM303SCLPin = 5;
+
+/*************** Constants *********************/
 
 const unsigned long MaxLoopsSinceCommand = 10000;  // TODO: 1 second.
 const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
 
-// Note that the Sabertooth serial interface is unidirectional, so only TX
-// is really needed here.
-SoftwareSerial sabertoothSerial(10, 11);  // RX, TX for talking to Sabertooth
+/*************** Globals *********************/
+
+// Sabertooth serial interface is unidirectional, so only TX is really needed
+SoftwareSerial sabertoothSerial(DriverRXPin, DriverTXPin);
+
+Potentiometer leftPot("LP", LeftPotPin);
+Potentiometer rightPot("RP", RightPotPin);
+Sensor* sensors[] = {
+  &leftPot,
+  &rightPot
+};
+const unsigned int NumSensors = sizeof(sensors) / sizeof(sensors[0]);
+
+/*************** Data Types  *********************/
 
 struct SerialCommand {
   enum Type {
@@ -23,6 +68,7 @@ struct SerialCommand {
   };
   SerialCommand() : type(BAD), leftVelocity(0), rightVelocity(0) { }
   SerialCommand(Type t) : type(t), leftVelocity(0), rightVelocity(0) { }
+
   Type type;
   int leftVelocity;
   int rightVelocity;
@@ -41,6 +87,8 @@ static struct State {
   bool emergencyStop;
 } state;
 
+/*************** Prototypes  *********************/
+
 const char* scan_int(const char* buf, int* value);
 SerialCommand parse_command_buffer(const char* buf, int len);
 SerialCommand read_server_command();
@@ -49,6 +97,7 @@ void emergency_stop();
 void send_state();
 void send_velocity_to_sabertooth(int left, int right);
 
+// begin code
 void setup()
 {
   // initialize the serial communication with the server
@@ -91,6 +140,9 @@ void loop()
     state.commandsReceived++;
     execute_command(cmd);
   }
+}
+
+void read_sensor_state() {
 }
 
 void execute_command(const SerialCommand& cmd)
@@ -139,12 +191,13 @@ void send_velocity_to_sabertooth(int left, int right)
   }
 }
 
+// sends the current program state to the computer
 void send_state()
 {
   if (state.loopsSinceStateSent++ < LoopsBetweenStateSend) {
     return;
   }
-  Serial.print("S ");
+  Serial.print("State: ");
 
   Serial.print("C:");
   Serial.print(state.commandsReceived, DEC);
@@ -160,10 +213,18 @@ void send_state()
 
   Serial.print("E:");
   Serial.print(state.emergencyStop, DEC);
+
+  Serial.print("Sensors: ");
+  for(unsigned int i = 0; i < NumSensors; i++) {
+    sensors[i]->read();
+    Serial.print(sensors[i]->get_data());
+  }
+
   Serial.print("\r\n");
   state.loopsSinceStateSent = 0;
 }
 
+// reads data from the serial port and returns the last sent SerialCommand
 SerialCommand read_server_command()
 {
   // Commands end with a '\n'
@@ -213,6 +274,7 @@ SerialCommand read_server_command()
   }
 }
 
+// parses string read from incoming serial from the computer into a SerialCommand
 SerialCommand parse_command_buffer(const char* buf, int len)
 {
   // Protocol from the server:
@@ -255,6 +317,7 @@ SerialCommand parse_command_buffer(const char* buf, int len)
   return cmd;
 }
 
+// used to read an integer from serial data
 const char* scan_int(const char* buf, int *value)
 {
   // initialize the value
