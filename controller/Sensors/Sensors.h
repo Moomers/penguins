@@ -35,4 +35,19 @@ class Potentiometer : public Sensor
     unsigned int last_value_;
 };
 
+class Sonar : public Sensor
+{
+  public:
+    Sonar(const char *sensor_prefix, const byte sonarPin);
+    virtual ~Sonar();
+
+    // Sensor interface
+    virtual void read();
+    virtual char *get_data();
+
+  private:
+    const byte pin_;
+    unsigned int last_value_;
+};
+
 #endif

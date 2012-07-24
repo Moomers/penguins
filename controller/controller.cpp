@@ -48,9 +48,12 @@ SoftwareSerial sabertoothSerial(DriverRXPin, DriverTXPin);
 
 Potentiometer leftPot("LP", LeftPotPin);
 Potentiometer rightPot("RP", RightPotPin);
+Sonar leftSonar("LS", LeftSonarPWPin);
+
 Sensor* sensors[] = {
   &leftPot,
-  &rightPot
+  &rightPot,
+  &leftSonar
 };
 const unsigned int NumSensors = sizeof(sensors) / sizeof(sensors[0]);
 
