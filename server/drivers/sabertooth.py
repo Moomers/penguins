@@ -6,36 +6,27 @@ class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
     def __init__(self, arduino):
         self.arduino = arduino
-
-    def _convert_brake(self, brake):
-        """We want a breaking value from 1 to 100, but the pololu uses 1 to 32"""
-        if brake < 1 or brake > 100:
-            raise DriverError("Braking speed outside the normal range")
-
-        return 1 if brake < 3 else int((brake - 3)/3)
+        self.last
 
     def _convert_speed(self, speed):
-        """We want to specify speeds from 0 to 100, but the pololu uses 0 to 3200"""
+        """We want to specify speeds from 0 to 100, but the sabertooth uses 0 to 63"""
         if speed > 100 or speed < -100:
-            raise DriverError("Speed outside the normal range")
+            raise common.DriverError("Speed outside the allowed range")
 
-        return speed * 32
+        return speed * 63 / 100
 
     ###### the interface of the driver #####
     def reset(self):
         """Resets the controllers into a basic run state"""
-        for c in self.controllers.values():
-            c.reset()
+        self.arduino.send_command('R')
 
     def stop(self):
         """Stops the robot"""
-        for c in self.controllers.values():
-            c.stop()
+        self.arduino.send_command('X')
 
     def brake(self, speed):
         """Applies braking to the motors"""
-        for c in self.controllers.values():
-            c.brake(self._convert_brake(speed))
+        self.speed = 0
 
     def set_speed(self, speed, motor = 'both'):
         """sets the speed of one or both motors"""
@@ -73,5 +64,8 @@ class SabertoothDriver(object):
 
         return status
 
-def get_driver(left, right, smccmd, **rest):
-    return SmcCmdDriver(left, right, smccmd)
+def get_driver(arduino, **rest):
+    if not arduino:
+        raise common.DriverError("The sabertooth driver requires a connection to an onboard Arduino to function")
+
+    return SabertoothDriver(arduino)
