@@ -7,240 +7,85 @@ import serial
 import threading
 import time
 
-# Some nicer constants for abbreviated sensor names.
-LEFT_POT = 'LP'
-RIGHT_POT = 'RP'
-LEFT_SONAR = 'LS'
-RIGHT_SONAR = 'RS'
-AMG_SENSOR = 'AMG'
-
-
-class AmgReading(object):
-    """A reading from a 3D orientation sensor."""
-
-    def __init__(self, value):
-        mags = [int(mag) for mag in value.split(',', 9)]
-        self.ax, self.ay, self.az = mags[:3]
-        self.mx, self.my, self.mz = mags[3:6]
-        self.gx, self.gy, self.gz = mags[6:]
-
-    def __repr__(self):
-        return "AmgReading('%s')" % ','.join(
-                str(s) for s in (self.ax, self.ay, self.az,
-                    self.mx, self.my, self.mz,
-                    self.gx, self.gy, self.gz))
-
-
-class PotReading(object):
-    """A reading from a potentiometer for steering control."""
-
-    def __init__(self, value):
-        # TODO: Normalize the range.
-        self.value = int(value)
-
-    def __repr__(self):
-        return "PotReading(%d)" % self.value
-
-
-class SonarReading(object):
-    """A reading from an ultrasound distance sensor."""
-
-    def __init__(self, distance):
-        self.distance = int(distance)
-
-    def __repr__(self):
-        return "SonarReading(%d)" % self.distance
-
-
-# The type of value each sensor produces.
-SENSORS = {
-    LEFT_POT: PotReading,
-    RIGHT_POT: PotReading,
-    LEFT_SONAR: SonarReading,
-    RIGHT_SONAR: SonarReading,
-    AMG_SENSOR: AmgReading,
-}
-
-
-class SensorData(object):
-    """Data from on-board sensors."""
-
-    def __init__(self, values=None):
-        self.values = values
-
-    @staticmethod
-    def parse(values):
-        """Parses sensor data from raw values.
-
-        Args:
-            values: A dict with raw sensor readings from the Arduino.
-
-        Returns:
-            A SensorData object.
-
-        Raises:
-            ValueError: If some sensor readings did not parse.
-            KeyError: If an invalid sensor name is specified.
-        """
-        parsed_values = {}
-        for name in values.keys():
-            parsed_values[name] = SENSORS[name](values[name])
-        return SensorData(parsed_values)
-
-    def get(self, name):
-        """Returns a reading from the named sensor."""
-        return self.values[name]
-
-    def __repr__(self):
-        return "SensorData(%s)" % str(self.values)
-
+from sensors import SensorReading
 
 class State(object):
     """Represents the Arduino's current state."""
 
-    def __init__(self, commands_received=0, bad_commands_received=0,
-                 loops_since_command_received=0, emergency_stop=False,
-                 sensor_data=None):
-        self.timestamp = time.time()
+    def __init__(self,
+            timestamp = time.time(),
+            commands_sent = 0,
+            commands_received = 0,
+            bad_commands_received = 0,
+            loops_since_command_received = 0,
+            emergency_stop = False,
+            ):
+        self.timestamp = timestamp
+        self.commands_sent = commands_sent
         self.commands_received = commands_received
         self.bad_commands_received = bad_commands_received
         self.loops_since_command_received = loops_since_command_received
         self.emergency_stop = emergency_stop
-        self.sensor_data = sensor_data
 
     def __repr__(self):
-        return "State(commands_received=%d, bad_commands_received=%d, "\
-               "loops_since_command_received=%d, emergency_stop=%d, "\
-               "sensor_data=%s)" % (
+        return "State(timestamp=%f, commands_sent=%d, commands_received=%d, "\
+                "bad_commands_received=%d, loops_since_command_received=%d, "\
+                "emergency_stop=%d)" % (
                        self.commands_received,
                        self.bad_commands_received,
                        self.loops_since_command_received,
-                       self.emergency_stop,
-                       self.sensor_data)
+                       self.emergency_stop)
 
-    @staticmethod
-    def parse(line):
-        """Parses a state line.
-
-        Returns:
-            A State object or None if the line is not well-formed."""
-        def get_groups(data):
-            groups = {}
-            for group in data.split(';'):
-                k, v = group.split(':')
-                groups[k] = v
-
-            return groups
-
-        line = line.strip()
-        try:
-            state, sensors = line.split('!', 2)
-            if not state.endswith(';') or not sensors.endswith(';'):
-                return None
-            state, sensors = get_groups(state[:-1]), get_groups(sensors[:-1])
-            return State(commands_received=int(state['C']),
-                         bad_commands_received=int(state['B']),
-                         loops_since_command_received=int(state['L']),
-                         emergency_stop=bool(int(state['E'])),
-                         sensor_data=SensorData.parse(sensors))
-        except:
-            # The state line did not parse correctly.
-            return None
-
-    def get_timestamp(self):
-        return self.timestamp
-
-    def get_commands_received(self):
-        return self.commands_received
-
-    def get_bad_commands_received(self):
-        return self.bad_commands_received
-
-    def get_loops_since_command_received(self):
-        return self.loops_since_command_received
-
-    def get_emergency_stop(self):
-        return self.emergency_stop
-
-    def get_sensor_reading(self, name):
-        if self.sensor_data:
-            return self.sensor_data.get(name)
-        return None
-
-
-class SerialMonitor(threading.Thread):
-    """Monitors state and sends a heartbeat to the Arduino serial port."""
+class ArduinoMonitor(threading.Thread):
+    """Monitors an Arduino state and sends regular heartbeat commands"""
 
     # Seconds between sending heartbeats.
     HEARTBEAT_SECS = 5
 
-    def __init__(self, serial, write_lock):
-        """Initializes the serial monitor.
+    def __init__(self, arduino):
+        """Initializes a serial monitor on an Arduino
 
         Args:
-            serial: A serial.Serial object shared with the Arduino.
-            write_lock: A threading.Lock to share write access to serial.
+            arduino: the Arduino this monitor is monitoring
         """
         threading.Thread.__init__(self)
 
-        self.serial = serial
+        self.arduino = arduino
         self.last_heartbeat_time = 0
-        self.write_lock = write_lock
-        self.healthy = False
-        self.state = None
+
+        # used to stop the monitor thread
         self._stop = threading.Event()
 
     def run(self):
         """Polls for state and sends a heartbeat."""
         # Run until told to stop.
         while not self._stop.isSet():
-            # Wait for up to HEARTBEAT_SECS for data to become available.
-            select.select([self.serial], [], [], self.HEARTBEAT_SECS)
-            if self.serial.inWaiting() != 0:
-                # The Arduino has started sending something.
-                line = self.serial.readline()
-                state = State.parse(line)
-                if state:
-                    # State parsed, so we are healthy.
-                    self.healthy = True
-                    # Save the new valid state.
-                    self.state = state
+            self.arduino.update_state(self.HEARTBEAT_SECS)
 
+            # Send a heartbeat if it is time.
             if time.time() - self.last_heartbeat_time >= self.HEARTBEAT_SECS:
-                # Send a heartbeat if it is time.
                 self.send_heartbeat()
+
+        # remove reference to the arduino (for GC)
+        self.arduino = None
 
     def stop(self):
         """Signals that the monitor thread should stop."""
         self._stop.set()
 
-    def is_healthy(self):
-        """Returns True if the link is healthy."""
-        return self.healthy
-
-    def get_state(self):
-        """Returns a copy of the current state."""
-        return copy.deepcopy(self.state)
-
     def send_heartbeat(self):
         """Sends a heartbeat to make sure the serial link stays ok."""
-        if not acquire(self.write_lock, 5):
-            # Another thread is holding the write lock. This is really weird.
-            # Just give up and declare ourselves unhealthy.
-            self.healthy = False
-            return
-        try:
-            self.serial.write('H\n')
-            self.last_heartbeat_time = time.time()
-        finally:
-            self.write_lock.release()
-
+        self.arduino.send_command('H')
+        self.last_heartbeat_time = time.time()
 
 class Arduino(object):
-    """Talks to an Arduino controller to read sensors and drive motors."""
+    """Represents an on-board arduino and provides a means of talking to it."""
 
     # Timeout for buffered serial I/O in seconds.
     IO_TIMEOUT_SEC = 5
+
+    # how stale does the state get until we are considered no longer healthy?
+    HEALTH_TIMEOUT = 5
 
     def __init__(self, port, baud_rate=9600):
         """Connects to the Arduino on a serial port.
@@ -260,36 +105,47 @@ class Arduino(object):
         if not self.serial.isOpen():
             raise ValueError("Couldn't open %s" % port)
 
-        # How many commands the server has sent to the Arduino.
+        # container for the internal state
+        self.state = None
+        self.sensor_readings = {}
+
+        # How many commands we've sent to the Arduino.
         self.commands_sent = 0
 
-        # Used to share the serial port with the monitor.
+        # used to make sure only a single thread tries to write to the arduino
         self.write_lock = threading.Lock()
 
-        self.monitor = SerialMonitor(self.serial, self.write_lock)
-        self.monitor.start()
+        # the monitor ensures communication is still flowing
+        self.monitor = ArduinoMonitor(self)
+
+    def __del__(self):
+        self.stop()
 
     def is_healthy(self):
         """Returns True if our link with the Arduino is healthy."""
-        return self.monitor.is_healthy()
+        return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
 
     def get_commands_sent(self):
         """Returns how many commands we think we've sent."""
         return self.commands_sent
 
-    def get_state(self):
-        """Returns the current state of the Arduino."""
-        return self.monitor.get_state()
+    def start_monitor(self):
+        """Starts the monitor thread that handles communication with the arduino"""
+        if not self.monitor.is_alive():
+            self.monitor.start()
 
     def stop(self):
-        """Shuts down communication between the server and the Arduino."""
+        """Shuts down communication to the Arduino."""
+        # shut down the monitor
         self.monitor.stop()
-        # Wait for the monitor to stop.
         self.monitor.join(timeout=5)
+
         # Maybe that worked, maybe it didn't. We're probably trying to reset
         # here, so just shut down hard and move on.
         if self.monitor.is_alive():
             logging.error('Monitor did not stop.')
+
+        # close the serial port
         self.serial.close()
 
     def send_command(self, command):
@@ -304,14 +160,95 @@ class Arduino(object):
         """
         if not acquire(self.write_lock, 2):
             return False
+
         try:
-            self.serial.write(command + "\n")
+            self.serial.write(command)
+            if not command.endswith('\n'):
+                self.serial.write('\n')
             self.serial.flush()
             self.commands_sent += 1
         finally:
             self.write_lock.release()
+
         return True
 
+    def _read_data(self, timeout = None):
+        """Reads a data line from the arduino"""
+        if timeout is None:
+            timeout = self.IO_TIMEOUT
+
+        line = None
+
+        # Wait for up to timeout seconds for data to become available.
+        select.select([self.serial], [], [], timeout)
+        if self.serial.inWaiting() != 0:
+            line = self.serial.readline().strip()
+
+        return line
+
+    def _parse_data(self, data):
+        """Parses the arduino raw arduino data into meaningful fields
+
+        The protocol for the data the arduino sends back is:
+            (State data)!(Sensor data)
+        Each data area is broken up into fields like so:
+            (Field name):(Field data);
+        and fields are concatenated together with no spaces
+        """
+        def get_fields(data):
+            """A helper function for splitting data into fields"""
+            fields = {}
+            for field in data.split(';'):
+                k, v = field.split(':')
+                fields[k] = v
+
+            return fields
+
+        state, sensors = data.split('!', 2)
+        if not state.endswith(';') or not sensors.endswith(';'):
+            return None
+
+        state, sensors = get_fields(state.rstrip(';')), get_fields(sensors.rstrip(';'))
+        return (state, sensors)
+
+    def update_state(self, timeout = 0):
+        """Updates the internal state with fresh data from the arduino"""
+        try:
+            state, sensors = self._parse_data(self._read_data(timeout))
+            timestamp = time.time()
+
+            # update the state
+            new_state = State(
+                    timestamp = timestamp,
+                    commands_sent = self.commands_sent,
+                    commands_received = int(state['C']),
+                    bad_commands_received = int(state['B']),
+                    loops_since_command_received = int(state['L']),
+                    emergency_stop = bool(int(state['E'])),
+                    sensor_data = sensors)
+            self.state = new_state
+
+            # update the new sensor readings
+            for sensor_name, sensor_data in sensors.items():
+                reading = SensorReading(timestamp, sensor_name, sensor_data)
+                self.sensor_readings[sensor_name] = reading
+
+        # failed to parse the state
+        except:
+            return False
+
+    def get_state(self):
+        """Returns a copy of the current state."""
+        return copy.deepcopy(self.state)
+
+    def get_sensor_reading(self, sensor_name):
+        """Gets the raw data for a particular sensor"""
+        try:
+            reading = self.state.sensor_readings[sensor_name]
+        except KeyError:
+            return None
+        else:
+            return copy.deepcopy(reading)
 
 def acquire(lock, timeout):
     """Acquire lock with a timeout"""
@@ -322,7 +259,7 @@ def acquire(lock, timeout):
     while time.time() < start_time + timeout:
         if lock.acquire(False):
             return True
-        time.sleep(.1)
+        time.sleep(.05)
 
     return False
 
