@@ -119,10 +119,15 @@ class Arduino(object):
         self.monitor = ArduinoMonitor(self)
 
     def __del__(self):
-        self.stop()
+        # There won't be a monitor if we failed to init the serial port.
+        if hasattr(self, 'monitor'):
+            self.stop()
 
     def is_healthy(self):
         """Returns True if our link with the Arduino is healthy."""
+        if not self.state:
+            # Not healthy until we've received a valid state.
+            return False
         return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
 
     def get_commands_sent(self):
@@ -175,7 +180,7 @@ class Arduino(object):
     def _read_data(self, timeout = None):
         """Reads a data line from the arduino"""
         if timeout is None:
-            timeout = self.IO_TIMEOUT
+            timeout = self.IO_TIMEOUT_SEC
 
         line = None
 
@@ -244,7 +249,7 @@ class Arduino(object):
     def get_sensor_reading(self, sensor_name):
         """Gets the raw data for a particular sensor"""
         try:
-            reading = self.state.sensor_readings[sensor_name]
+            reading = self.sensor_readings[sensor_name]
         except KeyError:
             return None
         else:

@@ -153,6 +153,7 @@ def main():
     if options.arduino_port:
         import arduino
         onboard_arduino = arduino.Arduino(options.arduino_port)
+        onboard_arduino.start_monitor()
 
     # get the driver
     try:
