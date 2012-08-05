@@ -17,7 +17,8 @@ class ArduinoConnectedSensor(Sensor):
 
     def _read(self):
         try:
-            return self.arduino.sensor_readings[self.key]
+            reading = self.arduino.sensor_readings[self.key]
+            return reading
         except KeyError:
             return None
 
@@ -29,7 +30,7 @@ class VoltageSensor(ArduinoConnectedSensor):
         self.voltage = None
 
         # resistors used on the divider, in ohms
-        self.ratio = R2 / R1
+        self.ratio = float(R1 + R2) / float(R2)
 
     def read(self):
         """reads the raw millivolt value from the arduino and scales it by the voltage divider ratio"""
@@ -37,7 +38,7 @@ class VoltageSensor(ArduinoConnectedSensor):
         if reading is None:
             self.voltage = None
         else:
-            self.voltage = self.ratio * (float(reading.data) * 5 / 1023)
+            self.voltage = self.ratio * float(reading.data) * 5 / 1023
 
         return self.voltage
 
@@ -56,8 +57,8 @@ class TemperatureSensor(ArduinoConnectedSensor):
         if reading is None:
             self.temperature = None
         else:
-            voltage = float(reading.data) * 5 / 1023
-            self.temperature = self.scaling_function(voltage)
+            mV = float(reading.data) * (5.0 / 1023) * 1000
+            self.temperature = self.scaling_function(mV)
 
         return self.temperature
 
