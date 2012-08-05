@@ -172,6 +172,7 @@ def main():
     onboard_arduino = None
     if options.arduino_port:
         onboard_arduino = arduino.Arduino(options.arduino_port)
+        onboard_arduino.start_monitor()
 
     # initialize the driver
     driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
