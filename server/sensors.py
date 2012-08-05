@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import time
+import traceback
 
 class Sensor(object):
     """This class defines an interface that all sensors must implement"""
@@ -36,7 +37,7 @@ class VoltageSensor(ArduinoConnectedSensor):
         if reading is None:
             self.voltage = None
         else:
-            self.voltage = self.ratio * reading.data
+            self.voltage = self.ratio * (float(reading.data) * 5 / 1023)
 
         return self.voltage
 
@@ -55,7 +56,8 @@ class TemperatureSensor(ArduinoConnectedSensor):
         if reading is None:
             self.temperature = None
         else:
-            self.temperature = self.scaling_function(reading.data)
+            voltage = float(reading.data) * 5 / 1023
+            self.temperature = self.scaling_function(voltage)
 
         return self.temperature
 
@@ -73,42 +75,52 @@ class Sonar(ArduinoConnectedSensor):
         if reading is None:
             self.distance = None
         else:
-            self.distance = reading.data
+            self.distance = int(reading.data)
 
         return self.distance
 
+    @property
     def status(self):
         return {'value':self.distance, 'units':'"'}
 
 class Encoder(ArduinoConnectedSensor):
     """A magnetic encoder reading the wheel speed via a hall effect sensor"""
-    def __init__(self, arduino, key, magnets = 2, window = 5):
+    def __init__(self, arduino, key, magnets = 2, window = 10):
         ArduinoConnectedSensor.__init__(self, arduino, key)
 
         self.magnets = magnets
+        self.window = window
+
+        self.rpm = None
         self.readings = []
 
     def read(self):
         """Process the RPMs of the encoder"""
         # try adding a new reading from the sensor to the list of readings
         reading = self._read()
-        if reading is not None and reading.timestamp > self.readings[-1].timestamp:
+        if reading is not None and (len(self.readings) == 0 or reading.timestamp > self.readings[-1].timestamp):
+            reading.data = int(reading.data)
             self.readings.append(reading)
 
         # get rid of stale readins that don't fit into the current window
         now = time.time()
-        for i in xrange(len(self.readings)):
-            if self.readings[i].timestamp > (now - self.window):
-                break
-        self.readings = self.readings[i:]
+        not_stale = 0
+        while not_stale < len(self.readings) and self.readings[not_stale].timestamp < (now - self.window):
+            not_stale += 1
+        self.readings = self.readings[not_stale:]
 
         # count the number of pulses in the current window; pulse count is monotonically increasing
-        pulses = self.readings[-1].data - self.readings[0].data
-        time_period = self.readings[-1].timestamp - now
+        if len(self.readings) < 2:
+            pulses = 0
+            time_period = self.window
+        else:
+            pulses = self.readings[-1].data - self.readings[0].data
+            time_period = self.readings[-1].timestamp - now
 
-        self.rpm = pulses / self.magnets / (time_period / 60)
+        self.rpm = (pulses / self.magnets) * (60 / time_period)
         return self.rpm
 
+    @property
     def status(self):
         return {'value':self.rpm, 'units':'RPM'}
 
