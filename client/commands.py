@@ -44,3 +44,13 @@ class Drive(object):
 
     def __repr__(self):
         return 'Drive(speed=%.4f)' % self.speed
+
+
+class Reset(object):
+    """Reset the controller."""
+
+    def __init__(self, pressed=False):
+        self.pressed = pressed
+
+    def __repr__(self):
+        return 'Reset(pressed=%d)' % self.pressed

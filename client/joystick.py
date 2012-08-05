@@ -69,7 +69,7 @@ class Profile(object):
     def __init__(self,
                  steering_axis=-1, left=0, center=0, right=0,
                  drive_axis=-1, forward=0, still=0, reverse=0,
-                 brake_button=-1, horn_button=-1):
+                 brake_button=-1, horn_button=-1, reset_button=-1):
         """Creates a joystick profile.
 
         Args:
@@ -83,6 +83,7 @@ class Profile(object):
             reverse: Drive value for full reverse.
             brake_button: The button that means brake.
             horn_button: The button that means honk.
+            reset_button: The button that resets the penguin.
         """
         self.steering_axis = steering_axis
         self.steering = (left, center, right)
@@ -90,6 +91,7 @@ class Profile(object):
         self.drive = (forward, still, reverse)
         self.brake_button = brake_button
         self.horn_button = horn_button
+        self.reset_button = reset_button
 
     def interpret(self, event):
         """Interprets a raw event as a comand."""
@@ -99,6 +101,8 @@ class Profile(object):
                 return commands.Brake(event.value)
             elif event.number == self.horn_button:
                 return commands.Horn(event.value)
+            elif event.number == self.reset_button:
+                return commands.Reset(event.value)
         elif event.event_type == RawEvent.AXIS:
             if event.number == self.steering_axis:
                 return commands.Steer(Normalize(event.value, self.steering))
@@ -113,7 +117,7 @@ class NESController(Profile):
         Profile.__init__(self,
             steering_axis=0, left=-32767, center=0, right=32511,
             drive_axis=1, forward=32511, still=0, reverse=-32767,
-            brake_button=2, horn_button=1)
+            brake_button=2, horn_button=1, reset_button=9)
 
 
 class Listener(threading.Thread):

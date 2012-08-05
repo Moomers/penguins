@@ -161,7 +161,8 @@ class Arduino(object):
     @property
     def status(self):
         """Returns a dictionary of the arduino's status for the client"""
-        status = {'healthy':self.is_healthy()}
+        status = {'healthy':self.is_healthy(),
+                  'estop':(not self.state or self.state.emergency_stop)}
 
     def send_command(self, command):
         """Sends a command to the Arduino.
