@@ -2,93 +2,115 @@
 
 import time
 
-# Some nicer constants for abbreviated sensor names.
-LEFT_POT = 'LP'
-RIGHT_POT = 'RP'
-LEFT_SONAR = 'LS'
-RIGHT_SONAR = 'RS'
-AMG_SENSOR = 'AMG'
+class Sensor(object):
+    """This class defines an interface that all sensors must implement"""
+    pass
 
+class ArduinoConnectedSensor(Sensor):
+    """A sensor connected to the on-board arduino"""
+    def __init__(self, arduino, key):
+        Sensor.__init__(self)
 
-class AmgReading(object):
-    """A reading from a 3D orientation sensor."""
+        self.arduino = arduino
+        self.key = key
 
-    def __init__(self, value):
-        mags = [int(mag) for mag in value.split(',', 9)]
-        self.ax, self.ay, self.az = mags[:3]
-        self.mx, self.my, self.mz = mags[3:6]
-        self.gx, self.gy, self.gz = mags[6:]
+    def _read(self):
+        try:
+            return self.arduino.sensor_readings[self.key]
+        except KeyError:
+            return None
 
-    def __repr__(self):
-        return "AmgReading('%s')" % ','.join(
-                str(s) for s in (self.ax, self.ay, self.az,
-                    self.mx, self.my, self.mz,
-                    self.gx, self.gy, self.gz))
+class VoltageSensor(ArduinoConnectedSensor):
+    """An analog sensor for determining voltage; uses a voltage divider on the arduino"""
+    def __init__(self, arduino, key, R1 = 1, R2 = 1):
+        ArduinoConnectedSensor.__init__(self, arduino, key)
 
+        self.voltage = None
 
-class PotReading(object):
-    """A reading from a potentiometer for steering control."""
+        # resistors used on the divider, in ohms
+        self.ratio = R2 / R1
 
-    def __init__(self, value):
-        # TODO: Normalize the range.
-        self.value = int(value)
+    def read(self):
+        """reads the raw millivolt value from the arduino and scales it by the voltage divider ratio"""
+        reading = self._read()
+        if reading is None:
+            self.voltage = None
+        else:
+            self.voltage = self.ratio * reading.data
 
-    def __repr__(self):
-        return "PotReading(%d)" % self.value
+        return self.voltage
 
+    @property
+    def status(self):
+        return {'value':self.voltage, 'units':'mV'}
 
-class SonarReading(object):
-    """A reading from an ultrasound distance sensor."""
+class TemperatureSensor(ArduinoConnectedSensor):
+    """A TMP36 connected to the arduino"""
+    def __init__(self, arduino, key, scaling_function = lambda voltage: (voltage - 500) / 10):
+        ArduinoConnectedSensor.__init__(self, arduino, key)
+        self.scaling_function = scaling_function
 
-    def __init__(self, distance):
-        self.distance = int(distance)
+    def read(self):
+        reading = self._read()
+        if reading is None:
+            self.temperature = None
+        else:
+            self.temperature = self.scaling_function(reading.data)
 
-    def __repr__(self):
-        return "SonarReading(%d)" % self.distance
+        return self.temperature
 
+    @property
+    def status(self):
+        return {'value':self.temperature, 'units':'C'}
 
-# The type of value each sensor produces.
-SENSORS = {
-    LEFT_POT: PotReading,
-    RIGHT_POT: PotReading,
-    LEFT_SONAR: SonarReading,
-    RIGHT_SONAR: SonarReading,
-    AMG_SENSOR: AmgReading,
-}
+class Sonar(ArduinoConnectedSensor):
+    """An LV-MaxSonar -EZ1 connected to the Arduino (via PWM)"""
+    def __init__(self, arduino, key):
+        ArduinoConnectedSensor.__init__(self, arduino, key)
 
+    def read(self):
+        reading = self._read()
+        if reading is None:
+            self.distance = None
+        else:
+            self.distance = reading.data
 
-class SensorData(object):
-    """Data from on-board sensors."""
+        return self.distance
 
-    def __init__(self, values=None):
-        self.values = values
+    def status(self):
+        return {'value':self.distance, 'units':'"'}
 
-    @staticmethod
-    def parse(values):
-        """Parses sensor data from raw values.
+class Encoder(ArduinoConnectedSensor):
+    """A magnetic encoder reading the wheel speed via a hall effect sensor"""
+    def __init__(self, arduino, key, magnets = 2, window = 5):
+        ArduinoConnectedSensor.__init__(self, arduino, key)
 
-        Args:
-            values: A dict with raw sensor readings from the Arduino.
+        self.magnets = magnets
+        self.readings = []
 
-        Returns:
-            A SensorData object.
+    def read(self):
+        """Process the RPMs of the encoder"""
+        # try adding a new reading from the sensor to the list of readings
+        reading = self._read()
+        if reading is not None and reading.timestamp > self.readings[-1].timestamp:
+            self.readings.append(reading)
 
-        Raises:
-            ValueError: If some sensor readings did not parse.
-            KeyError: If an invalid sensor name is specified.
-        """
-        parsed_values = {}
-        for name in values.keys():
-            parsed_values[name] = SENSORS[name](values[name])
-        return SensorData(parsed_values)
+        # get rid of stale readins that don't fit into the current window
+        now = time.time()
+        for i in xrange(len(self.readings)):
+            if self.readings[i].timestamp > (now - self.window):
+                break
+        self.readings = self.readings[i:]
 
-    def get(self, name):
-        """Returns a reading from the named sensor."""
-        return self.values[name]
+        # count the number of pulses in the current window; pulse count is monotonically increasing
+        pulses = self.readings[-1].data - self.readings[0].data
+        time_period = self.readings[-1].timestamp - now
 
-    def __repr__(self):
-        return "SensorData(%s)" % str(self.values)
+        self.rpm = pulses / self.magnets / (time_period / 60)
+        return self.rpm
 
+    def status(self):
+        return {'value':self.rpm, 'units':'RPM'}
 
 class SensorReading(object):
     """Represents a reading from a sensor attached to the arduino"""
