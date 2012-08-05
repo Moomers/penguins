@@ -148,6 +148,15 @@ class Arduino(object):
         # close the serial port
         self.serial.close()
 
+    def reset(self):
+        """Resets the arduino"""
+        # TODO
+        pass
+
+    def status(self):
+        """Returns a dictionary of the arduino's status for the client"""
+        status = {'healthy':self.is_healthy()}
+
     def send_command(self, command):
         """Sends a command to the Arduino.
 
