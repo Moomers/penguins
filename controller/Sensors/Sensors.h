@@ -32,10 +32,8 @@ class AnalogSensor : public Sensor
     virtual char *get_data();
 
   private:
-    long read_vcc();
-
     const byte pin_;
-    unsigned long last_value_;
+    unsigned int last_value_;
 };
 
 class DigitalSensor : public Sensor
