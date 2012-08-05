@@ -134,7 +134,6 @@ void setup()
 {
   // initialize the serial communication with the server
   Serial.begin(9600);
-  Serial.println("R");  // Tell the server we reset.
 
   // start the wire protocol
   Wire.begin();
@@ -151,6 +150,9 @@ void setup()
   pinMode(StoppedLEDPin, OUTPUT);
   pinMode(WarnLEDPin, OUTPUT);
   pinMode(RunLEDPin, OUTPUT);
+
+  // go into emergency stop to begin with
+  emergency_stop();
 }
 
 void loop()
