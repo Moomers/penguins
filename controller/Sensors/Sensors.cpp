@@ -28,15 +28,38 @@ AnalogSensor::AnalogSensor(const char *sensor_prefix, const byte sensorPin)
 AnalogSensor::~AnalogSensor() {
 }
 
+// stollen from the discussion on analog read accuracy, here:
+// http://hacking.majenko.co.uk/node/57
+long AnalogSensor::read_vcc() {
+  long result;
+
+  // Read 1.1V reference against AVcc
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(2); // Wait for Vref to settle
+
+  ADCSRA |= _BV(ADSC); // Convert
+  while (bit_is_set(ADCSRA,ADSC));
+  result = ADCL;
+  result |= ADCH<<8;
+
+  // Back-calculate AVcc in mV
+  result = 1125300L / result;
+  return result;
+}
+
 void AnalogSensor::read() {
-  last_value_ = analogRead(pin_);
+  //last_value_ = read_vcc(); // in millivolts
+  //long vcc = read_vcc(); // in millivolts
+  //last_value_ = (analogRead(pin_) * 1000L * vcc) / 1023L; // still in millivolts
+  last_value_ = (long)(analogRead(pin_) * 5000) / 1023L;
+  //last_value_ = analogRead(pin_);
 }
 
 char *AnalogSensor::get_data() {
   if (last_value_ > 1024) {
     return NULL;
   } else {
-    static char buf[10];
+    static char buf[16];
     sprintf(buf, "%s:%d", prefix_, last_value_);
     return buf;
   }
