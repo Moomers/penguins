@@ -40,7 +40,7 @@ class ArduinoMonitor(threading.Thread):
     """Monitors an Arduino state and sends regular heartbeat commands"""
 
     # Seconds between sending heartbeats.
-    HEARTBEAT_SECS = 5
+    HEARTBEAT_SECS = 2
 
     def __init__(self, arduino):
         """Initializes a serial monitor on an Arduino
@@ -60,7 +60,7 @@ class ArduinoMonitor(threading.Thread):
         """Polls for state and sends a heartbeat."""
         # Run until told to stop.
         while not self._stop.isSet():
-            self.arduino.update_state(self.HEARTBEAT_SECS)
+            updated = self.arduino.update_state(self.HEARTBEAT_SECS)
 
             # Send a heartbeat if it is time.
             if time.time() - self.last_heartbeat_time >= self.HEARTBEAT_SECS:
@@ -123,7 +123,10 @@ class Arduino(object):
 
     def is_healthy(self):
         """Returns True if our link with the Arduino is healthy."""
-        return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
+        if self.state is None:
+            return False
+        else:
+            return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
 
     def get_commands_sent(self):
         """Returns how many commands we think we've sent."""
@@ -153,6 +156,7 @@ class Arduino(object):
         # TODO
         pass
 
+    @property
     def status(self):
         """Returns a dictionary of the arduino's status for the client"""
         status = {'healthy':self.is_healthy()}
@@ -233,8 +237,7 @@ class Arduino(object):
                     commands_received = int(state['C']),
                     bad_commands_received = int(state['B']),
                     loops_since_command_received = int(state['L']),
-                    emergency_stop = bool(int(state['E'])),
-                    sensor_data = sensors)
+                    emergency_stop = bool(int(state['E'])),)
             self.state = new_state
 
             # update the new sensor readings
@@ -245,6 +248,8 @@ class Arduino(object):
         # failed to parse the state
         except:
             return False
+        else:
+            return True
 
     def get_state(self):
         """Returns a copy of the current state."""
