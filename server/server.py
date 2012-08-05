@@ -32,6 +32,67 @@ class DriverHandler(SocketServer.StreamRequestHandler):
         self.wfile.write(data)
         self.wfile.flush()
 
+    def process_command(self, command):
+        """Processes a command from the client and returns the correct output"""
+        driver = self.server.driver
+
+        parts = command.split()
+        if parts[0] == 'stop':
+            driver.stop()
+            output = 'robot stopped'
+
+        elif parts[0] == 'brake':
+            try:
+                new_speed = self.parse_speed(parts)
+                if new_speed < 1 or new_speed > 100:
+                    raise ValueError("out of range")
+            except:
+                raise CommandError("brake must be a number from 1 to 100")
+
+            driver.brake(new_speed)
+            output = 'braking initiated'
+
+        elif parts[0] == 'status':
+            output = {'status':{
+                'driver':driver.status,
+                'arduino':self.server.arduino.status,
+                'sensors':[]}}
+
+            for name, sensor in self.server.sensors.items():
+                sensor.read()
+                status = sensor.status
+                status['name'] = name
+                output['status']['sensors'].append(sensor.status)
+
+        elif parts[0] == 'reset':
+            driver.reset()
+            self.server.arduino.reset()
+            output = "driver reset successful"
+
+        elif parts[0] in ('speed', 'left', 'right'):
+            #try to get a number out of parts[1]
+            try:
+                new_speed = self.parse_speed(parts)
+                if new_speed and (new_speed < -100 or new_speed > 100):
+                    raise ValueError("out of range")
+            except Exception, e:
+                raise CommandError("speed must be a number from -100 to 100, %s" % e)
+
+            #figure out which if any motor we want to deal with
+            motor = parts[0] if parts[0] in ('left', 'right') else 'both'
+
+            if new_speed is not None:
+                driver.set_speed(new_speed, motor)
+                output = "speed set to %s" % new_speed
+            else:
+                speeds = driver.get_speed(motor)
+                output = ",".join([str(s) for s in speeds])
+
+        else:
+            raise CommandError("invalid command '%s'" % command)
+
+        return output
+
     def handle(self):
         """writes requests from the client into a queue"""
         while True:
@@ -46,53 +107,7 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 break
 
             try:
-                driver = self.server.driver
-
-                parts = command.split()
-                if parts[0] == 'stop':
-                    driver.stop()
-                    output = 'robot stopped'
-
-                elif parts[0] == 'brake':
-                    try:
-                        new_speed = self.parse_speed(parts)
-                        if new_speed < 1 or new_speed > 100:
-                            raise ValueError("out of range")
-                    except:
-                        raise CommandError("brake must be a number from 1 to 100")
-
-                    driver.brake(new_speed)
-                    output = 'braking initiated'
-
-                elif parts[0] == 'status':
-                    output = driver.status
-
-                elif parts[0] == 'reset':
-                    driver.reset()
-                    output = "driver reset successful"
-
-                elif parts[0] in ('speed', 'left', 'right'):
-                    #try to get a number out of parts[1]
-                    try:
-                        new_speed = self.parse_speed(parts)
-                        if new_speed and (new_speed < -100 or new_speed > 100):
-                            raise ValueError("out of range")
-                    except Exception, e:
-                        raise CommandError("speed must be a number from -100 to 100, %s" % e)
-
-                    #figure out which if any motor we want to deal with
-                    motor = parts[0] if parts[0] in ('left', 'right') else 'both'
-
-                    if new_speed is not None:
-                        driver.set_speed(new_speed, motor)
-                        output = "speed set to %s" % new_speed
-                    else:
-                        speeds = driver.get_speed(motor)
-                        output = ",".join([str(s) for s in speeds])
-
-                else:
-                    raise CommandError("invalid command '%s'" % command)
-
+                output = self.process_command(command)
             except CommandError, e:
                 self.send_output('invalid', e.message)
             except Exception, e:
