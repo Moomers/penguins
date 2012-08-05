@@ -1,11 +1,14 @@
 #!/usr/bin/python
 
 import SocketServer
-import drivers, drivers.smcserial, drivers.smcstub, drivers.smccmd
+import drivers
 import cPickle as pickle
 import traceback
 
 from optparse import OptionParser, OptionGroup
+
+import arduino
+import sensors
 
 class CommandError(ValueError):
     pass
@@ -117,13 +120,6 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 self.send_output('ok', output)
 
 def main():
-    driverlist = {
-            'smccmd':('Runs SmcCmd to process every request', drivers.smccmd),
-            'smcserial':('Drives controllers using the serial protocol via a tty interface', drivers.smcserial),
-            'smcstub':('Stub test driver for SMC controller-based drivers', drivers.smcstub),
-            'sabertooth':('Talks to the Sabertooth 2x60 via the on-board arduino', drivers.sabertooth),
-            }
-
     parser = OptionParser()
     parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
             help="Print more debug info")
@@ -131,7 +127,7 @@ def main():
             help="List the available drivers")
 
     opgroup = OptionGroup(parser, "Operational options")
-    opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=driverlist.keys(),
+    opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=drivers.driverlist.keys(),
             help="Drive using this driver [Default: smcserial]")
     opgroup.add_option('-o', '--arduino', action="store", type="string", dest="arduino_port", default=None,
             help="Port of the on-board Arduino [Default: None (no arduino)]")
@@ -156,31 +152,48 @@ def main():
 
     # parse the arguments
     options, args = parser.parse_args()
+
+    # if we requested a driver list, list drivers and then exit
     if options.list:
         print "Available drivers:"
-        for name, info in driverlist.items():
+        for name, info in drivers.driverlist.items():
             print "%s %s" % (name.ljust(30), info[0])
 
         return 0
 
+    # try to get the driver
+    try:
+        drivermod = drivers.driverlist[options.driver][1]
+    except:
+        parser.error("You must specify a driver")
+
+    # we got a valid driver, lets initialize the robot
     # start talking to the onboard arduino
     onboard_arduino = None
     if options.arduino_port:
-        import arduino
         onboard_arduino = arduino.Arduino(options.arduino_port)
 
-    # get the driver
-    try:
-        drivermod = driverlist[options.driver][1]
-    except:
-        parser.error("You must specify a driver")
-    else:
-        driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
+    # initialize the driver
+    driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
+
+    # make a list of sensors
+    sensor_list = {
+            'Battery voltage':sensors.VoltageSensor(onboard_arduino, 'BV', 100000, 10000),
+            'Driver temperature':sensors.TemperatureSensor(onboard_arduino, 'DT'),
+            'Left sonar':sensors.Sonar(onboard_arduino, 'LS'),
+            'Right sonar':sensors.Sonar(onboard_arduino, 'RS'),
+            'Left encoder':sensors.Encoder(onboard_arduino, 'LE'),
+            'Right encoder':sensors.Encoder(onboard_arduino, 'RE'),
+            }
+
+    # start the arduino monitor thread
+    onboard_arduino.start_monitor()
 
     # start the server
     server = TCPServer((options.host, options.port), DriverHandler)
     server.arduino = onboard_arduino
     server.driver = driver
+    server.sensors = sensor_list
 
     try:
         server.serve_forever()
