@@ -65,7 +65,7 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 sensor.read()
                 status = sensor.status
                 status['name'] = name
-                output['status']['sensors'].append(sensor.status)
+                output['status']['sensors'].append(status)
 
         elif parts[0] == 'reset':
             driver.reset()
