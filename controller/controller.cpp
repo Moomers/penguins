@@ -10,41 +10,42 @@
 
 /*********** Pin Assignments ***********************/
 
-// these aren't used in the code, they're just here
-// as a reminder that those pins are not available
-const byte ServerRXPin = 0;
-const byte ServerTXPin = 1;
-
-// talking to the Sabertooth driver
-const byte DriverRXPin = 10;
-const byte DriverTXPin = 11;
-
-// reading the pot for steering (analog pins)
-const byte LeftPotPin = 0;
-const byte RightPotPin = 1;
+// temperature sensor (analog pin)
+const byte TemperaturePin = 2;
 
 // for sensing the approximate voltage on the battery (analog pin)
-const byte BatteryVoltagePin = 2;
-
-// pushbuttons on controller
-const byte LeftButtonPin = 6;
-const byte RightButtonPin = 7;
-
-// motor speed (these pins can be interrupts)
-const byte LeftEncoderPin = 2;
-const byte RightEncoderPin = 3;
-
-// sonar
-const byte LeftSonarPWPin = 4;
-const byte rightSonarPWPin = 5;
+const byte BatteryVoltagePin = 3;
 
 // magnetometer/accelerometer LSM303 (analog pins)
 const byte LSM303SDAPin = 4;
 const byte LSM303SCLPin = 5;
 
+// these aren't used in the code, they're just here
+// as a reminder that those pins are not available
+const byte ServerRXPin = 0;
+const byte ServerTXPin = 1;
+
+// motor speed (these pins can be interrupts)
+const byte RightEncoderPin = 2;
+const byte LeftEncoderPin = 3;
+
+// sonar
+const byte LeftSonarPWPin = 4;
+const byte RightSonarPWPin = 5;
+
+// talking to the Sabertooth driver
+const byte DriverTXPin = 9;
+const byte DriverRXPin = 10;
+
+// used to show that the arduino main loop is running
+const byte StoppedLEDPin = 11;
+const byte WarnLEDPin = 12;
+const byte RunLEDPin = 13;
+
+
 /*************** Constants *********************/
 
-const unsigned long MaxLoopsSinceCommand = 10000;  // TODO: 1 second.
+const unsigned long MaxLoopsSinceCommand = 100000;  // TODO: 1 second.
 const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
 
 /*************** Globals *********************/
@@ -52,15 +53,11 @@ const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
 // Sabertooth serial interface is unidirectional, so only TX is really needed
 SoftwareSerial sabertoothSerial(DriverRXPin, DriverTXPin);
 
-AnalogSensor leftPot("LP", LeftPotPin);
-AnalogSensor rightPot("RP", RightPotPin);
 AnalogSensor voltage("BV", BatteryVoltagePin);
-
-DigitalSensor leftButton("LB", LeftButtonPin);
-DigitalSensor rightButton("RB", RightButtonPin);
+AnalogSensor temperature("DT", TemperaturePin);
 
 Sonar leftSonar("LS", LeftSonarPWPin);
-//Sonar rightSonar("RS", RightSonarPWPin);
+Sonar rightSonar("RS", RightSonarPWPin);
 Encoder leftEncoder("LE", LeftEncoderPin);
 Encoder rightEncoder("RE", RightEncoderPin);
 
@@ -69,21 +66,19 @@ AMG amg("AMG");
 #endif
 
 Sensor* sensors[] = {
-  &leftPot,
-  &rightPot,
   &voltage,
-
-  &leftButton,
-  &rightButton,
+  &temperature,
 
   &leftSonar,
-//  &rightSonar,
+  &rightSonar,
+
   &leftEncoder,
   &rightEncoder,
 #if defined(USE_AMG)
   &amg,
 #endif
 };
+
 const unsigned int NumSensors = sizeof(sensors) / sizeof(sensors[0]);
 
 /*************** Data Types  *********************/
@@ -111,12 +106,14 @@ static struct State {
     commandsReceived(0),
     loopsSinceLastCommand(0),
     loopsSinceStateSent(0),
-    emergencyStop(false) { }
+    emergencyStop(false),
+    runLED(false) { }
   unsigned long badCommandsReceived;
   unsigned long commandsReceived;
   unsigned long loopsSinceLastCommand;
   unsigned long loopsSinceStateSent;
   bool emergencyStop;
+  bool runLED;
 } state;
 
 /*************** Prototypes  *********************/
@@ -125,11 +122,12 @@ const char* scan_int(const char* buf, int* value);
 SerialCommand parse_command_buffer(const char* buf, int len);
 SerialCommand read_server_command();
 void execute_command(const SerialCommand& cmd);
-void emergency_stop();
 void send_state();
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
+void emergency_stop();
+void toggle_led();
 
 // begin code
 void setup()
@@ -148,6 +146,11 @@ void setup()
   // initialize the interrupts on encoders
   attachInterrupt(LeftEncoderPin - 2, left_encoder_interrupt, RISING);
   attachInterrupt(RightEncoderPin - 2, right_encoder_interrupt, RISING);
+
+  // initialize the led pin
+  pinMode(StoppedLEDPin, OUTPUT);
+  pinMode(WarnLEDPin, OUTPUT);
+  pinMode(RunLEDPin, OUTPUT);
 }
 
 void loop()
@@ -203,6 +206,7 @@ void execute_command(const SerialCommand& cmd)
 
   if (cmd.type == SerialCommand::RESET) {
     state.emergencyStop = false;
+    digitalWrite(StoppedLEDPin, LOW);
   }
 
   if (cmd.type == SerialCommand::VELOCITY) {
@@ -274,7 +278,9 @@ void send_state()
   }
 
   Serial.print("\r\n");
+
   state.loopsSinceStateSent = 0;
+  toggle_led();
 }
 
 // reads data from the serial port and returns the last sent SerialCommand
@@ -397,5 +403,19 @@ const char* scan_int(const char* buf, int *value)
 void emergency_stop() 
 {
   state.emergencyStop = true;
+  digitalWrite(StoppedLEDPin, HIGH);
   send_velocity_to_sabertooth(0,0);
+}
+
+void toggle_led()
+{
+  if(state.runLED) {
+    digitalWrite(RunLEDPin, LOW);
+    state.runLED = false;
+  } else {
+    digitalWrite(RunLEDPin, HIGH);
+    state.runLED = true;
+  }
+
+
 }
