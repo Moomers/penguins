@@ -18,7 +18,7 @@ class SabertoothDriver(object):
 
     ###### the interface of the driver #####
     def reset(self):
-        """Resets the controllers into a basic run state"""
+        """Resets the controller into a basic run state"""
         self.arduino.send_command('R')
 
     def stop(self):
@@ -41,17 +41,16 @@ class SabertoothDriver(object):
         elif motor == 'right':
             self.speeds = (old_left, speed)
 
-        self.arduino.send_command('V%d,%d' % self.speeds)
+        self.arduino.send_command('V%d,%d' % (self.right, self.left))
 
     def get_speed(self, motor = 'both'):
         """Returns the current speed of a motor"""
-        speeds = []
-        controllers = self.controllers.values() if motor == 'both' else [self.controllers[motor]]
-        for c in controllers:
-            speed = self._convert_speed(c.speed)
-            speeds.append(speed)
-
-        return speeds
+        if motor == 'both':
+            return list(self.speeds)
+        elif motor == 'left':
+            return [self.speeds[0]]
+        elif motor == 'right':
+            return [self.speeds[1]]
 
     speed = property(
             lambda self: self.get_speed('both'),
