@@ -4,9 +4,10 @@ import common
 
 class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
+
     def __init__(self, arduino):
         self.arduino = arduino
-        self.last
+        self.speeds = (0, 0)
 
     def _convert_speed(self, speed):
         """We want to specify speeds from 0 to 100, but the sabertooth uses 0 to 63"""
@@ -31,9 +32,16 @@ class SabertoothDriver(object):
     def set_speed(self, speed, motor = 'both'):
         """sets the speed of one or both motors"""
         #easily handle setting both or a single motor
-        controllers = self.controllers.values() if motor == 'both' else [self.controllers[motor]]
-        for c in controllers:
-            c.speed = self._convert_speed(speed)
+        old_left, old_right = self.speeds
+        speed = self._convert_speed(speed)
+        if motor == 'both':
+            self.speeds = (speed, speed)
+        elif motor == 'left':
+            self.speeds = (speed, old_right)
+        elif motor == 'right':
+            self.speeds = (old_left, speed)
+
+        self.arduino.send_command('V%d,%d' % self.speeds)
 
     def get_speed(self, motor = 'both'):
         """Returns the current speed of a motor"""
@@ -58,11 +66,10 @@ class SabertoothDriver(object):
 
     @property
     def status(self):
-        status = {}
-        for side, c in self.controllers.items():
-            status[side] = c.status
-
-        return status
+        return {
+                'left':self.speeds[0],
+                'right':self.speeds[1],
+                }
 
 def get_driver(arduino, **rest):
     if not arduino:
