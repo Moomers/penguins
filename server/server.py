@@ -3,12 +3,14 @@
 import SocketServer
 import drivers
 import cPickle as pickle
+import time
 import traceback
 
 from optparse import OptionParser, OptionGroup
 
 import arduino
 import sensors
+import monitor
 
 class CommandError(ValueError):
     pass
@@ -174,10 +176,12 @@ def main():
 
     # we got a valid driver, lets initialize the robot
     # start talking to the onboard arduino
-    onboard_arduino = None
     if options.arduino_port:
         onboard_arduino = arduino.Arduino(options.arduino_port)
         onboard_arduino.start_monitor()
+    else:
+        print "Warning: starting with a fake arduino because no arduino port was passed in!"
+        onboard_arduino = arduino.FakeArduino()
 
     # initialize the driver
     driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
@@ -195,12 +199,17 @@ def main():
     # start the arduino monitor thread
     onboard_arduino.start_monitor()
 
-    # start the server
+    # create the TCP server
     server = TCPServer((options.host, options.port), DriverHandler)
     server.arduino = onboard_arduino
     server.driver = driver
     server.sensors = sensor_list
 
+    # start the server monitor thread
+    server_monitor = monitor.ServerMonitor(server)
+    server_monitor.start()
+
+    # now accept requests
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -209,8 +218,8 @@ def main():
         print "Shutting down"
         server.server_close()
         driver.stop()
-        if onboard_arduino:
-            onboard_arduino.stop()
+        server_monitor.stop()
+        onboard_arduino.stop()
 
 if __name__ == "__main__":
     main()
