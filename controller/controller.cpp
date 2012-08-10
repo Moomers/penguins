@@ -216,8 +216,7 @@ void execute_command(const SerialCommand& cmd)
   }
 
   if (cmd.type == SerialCommand::STOP) {
-    state.emergencyStop = true;
-    send_velocity_to_sabertooth(0, 0);
+    emergency_stop();
   }
 }
 
