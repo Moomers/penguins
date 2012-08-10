@@ -99,10 +99,10 @@ class Arduino(object):
             SerialError: There is a configuration error.
         """
         # Build the serial wrapper.
-        self.serial = serial.Serial(port=port,
+        self._serial = serial.serial(port=port,
                 baudrate=baud_rate, bytesize=8, parity='N', stopbits=1,
                 timeout=self.IO_TIMEOUT_SEC, writeTimeout=self.IO_TIMEOUT_SEC)
-        if not self.serial.isOpen():
+        if not self._serial.isOpen():
             raise ValueError("Couldn't open %s" % port)
 
         # container for the internal state
@@ -151,7 +151,7 @@ class Arduino(object):
             logging.error('Monitor did not stop.')
 
         # close the serial port
-        self.serial.close()
+        self._serial.close()
 
     def reset(self):
         """Resets the arduino"""
@@ -179,10 +179,10 @@ class Arduino(object):
             return False
 
         try:
-            self.serial.write(command)
+            self._serial.write(command)
             if not command.endswith('\n'):
-                self.serial.write('\n')
-            self.serial.flush()
+                self._serial.write('\n')
+            self._serial.flush()
             self.commands_sent += 1
         finally:
             self.write_lock.release()
@@ -197,9 +197,9 @@ class Arduino(object):
         line = None
 
         # Wait for up to timeout seconds for data to become available.
-        select.select([self.serial], [], [], timeout)
-        if self.serial.inWaiting() != 0:
-            line = self.serial.readline().strip()
+        select.select([self._serial], [], [], timeout)
+        if self._serial.inWaiting() != 0:
+            line = self._serial.readline().strip()
 
         return line
 
