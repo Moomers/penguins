@@ -98,26 +98,31 @@ class DriverHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
         """writes requests from the client into a queue"""
-        while True:
-            command = self.rfile.readline().strip()
+        try:
+            while True:
+                command = self.rfile.readline().strip()
 
-            if not command:
-                self.send_output('ok', '')
-                continue
+                self.server.last_request = time.time()
 
-            if command == 'exit':
-                self.send_output('ok', 'done')
-                break
+                if not command:
+                    self.send_output('ok', '')
+                    continue
 
-            try:
-                output = self.process_command(command)
-            except CommandError, e:
-                self.send_output('invalid', e.message)
-            except Exception, e:
-                traceback.print_exc()
-                self.send_output('error', str(e))
-            else:
-                self.send_output('ok', output)
+                if command == 'exit':
+                    self.send_output('ok', 'done')
+                    break
+
+                try:
+                    output = self.process_command(command)
+                except CommandError, e:
+                    self.send_output('invalid', e.message)
+                except Exception, e:
+                    traceback.print_exc()
+                    self.send_output('error', str(e))
+                else:
+                    self.send_output('ok', output)
+        finally:
+            self.server.driver.stop()
 
 def main():
     parser = OptionParser()
