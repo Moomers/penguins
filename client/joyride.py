@@ -12,6 +12,10 @@ import threading
 import Queue
 import wave
 
+MAX_VEL = 100
+ACCEL = 5
+TURN_ACCEL = 5
+DECAY = 0.94
 SOUND_DIR = '../sounds/joyride'
 
 class Sound(object):
@@ -60,30 +64,66 @@ def main():
     sounds = dict((name, Sound(name))
                   for name in ['bing', 'ebrake', 'honk', 'yay', 'screech'])
     js = joystick.Joystick('/dev/input/js0', joystick.NESController())
-    vleft, vright = 0, 0
+    last_v_left, last_v_right = 0, 0
+    v_left, v_right = 0, 0
+    decay = True
     estop = False
     try:
         while True:
             time.sleep(0.01)
-            try:
-                status = penguin.status()
-                if not estop and status['ardunio']['estop']:
-                    mixer.queue(sounds['ebrake'])
-                    estop = True
-                elif estop and not status['arduino']['estop']:
-                    mixer.queue(sounds['yay'])
-                    estop = False
-            except:
-                pass
-            if js.has_events():
-                ev = js.pop_event()
+            status = penguin.status
+            arduino_status = status['status']['arduino']
+            if not estop and arduino_status['estop']:
+                mixer.queue(sounds['ebrake'])
+                estop = True
+            elif estop and not arduino_status['estop']:
+                mixer.queue(sounds['yay'])
+                estop = False
+            ev = js.get_event()
+            if ev:
                 if type(ev) == commands.Horn and ev.pressed:
                     mixer.queue(sounds['honk'])
                 elif type(ev) == commands.Brake and ev.pressed:
                     mixer.queue(sounds['screech'])
+                    # emergency stop for now
+                    penguin.stop()
+                elif type(ev) == commands.Drive:
+                    if ev.speed == -1: # go forward
+                       v_left += ACCEL
+                       v_right += ACCEL
+                       decay = False
+                    elif ev.speed == 1: # reverse
+                       v_left -= ACCEL
+                       v_right -= ACCEL
+                       decay = False
+                    elif ev.speed == 0: # release button
+                       decay = True
+                elif type(ev) == commands.Steer:
+                    if ev.direction == -1: # go left
+                       v_left -= TURN_ACCEL
+                       v_right += TURN_ACCEL
+                    elif ev.direction == 1: # go right
+                       v_left += TURN_ACCEL
+                       v_right -= TURN_ACCEL
                 elif type(ev) == commands.Reset and not ev.pressed:
                     # issue reset when the button is released.
                     penguin.reset()
+            if decay:
+               v_left *= DECAY
+               v_right *= DECAY
+            if v_left < -MAX_VEL: v_left = -MAX_VEL
+            if v_right < -MAX_VEL: v_right = -MAX_VEL
+            if v_left > MAX_VEL: v_left = MAX_VEL
+            if v_right > MAX_VEL: v_right = MAX_VEL
+            if v_left != last_v_left:
+               penguin.left = int(v_left)
+            if v_right != last_v_right:
+               penguin.right = int(v_right)
+            if abs(v_left) < 1: v_left = 0
+            if abs(v_right) < 1: v_right = 0
+            print v_left, v_right
+            last_v_right = v_right
+            last_v_left = v_left
     except KeyboardInterrupt:
         pass
     js.close()
