@@ -115,8 +115,8 @@ class NESController(Profile):
 
     def __init__(self):
         Profile.__init__(self,
-            steering_axis=0, left=-32767, center=0, right=32511,
-            drive_axis=1, forward=32511, still=0, reverse=-32767,
+            steering_axis=3, left=-32767, center=0, right=32767,
+            drive_axis=4, forward=-32767, still=0, reverse=32767,
             brake_button=2, horn_button=1, reset_button=9)
 
 
@@ -127,7 +127,7 @@ class Listener(threading.Thread):
         threading.Thread.__init__(self)
         self.device = open(device_path, 'rb', 0)
         self.events_lock = threading.Lock()
-        self.events = []
+        self.last_event = None
         self._stop = threading.Event()
 
     def stop(self):
@@ -144,23 +144,17 @@ class Listener(threading.Thread):
             data = self.device.read(RawEvent.BYTES)
             event = RawEvent.Unpack(data)
             self.events_lock.acquire()
-            self.events.append(event)
+            self.last_event = event
             self.events_lock.release()
         self.device.close()
 
-    def has_events(self):
-        """Returns true iff there are pending events."""
-        self.events_lock.acquire()
-        try:
-            return len(self.events)
-        finally:
-            self.events_lock.release()
-
-    def pop_event(self):
+    def get_event(self):
         """Pops and returns the oldest queued event."""
         self.events_lock.acquire()
         try:
-            return self.events.pop(0)
+            event = self.last_event
+            self.last_event = None
+            return event
         finally:
             self.events_lock.release()
 
@@ -182,14 +176,11 @@ class Joystick(object):
         self.listener.start()
         self.profile = profile
 
-    def has_events(self):
+    def get_event(self):
         """Returns True iff the joystick has pending events."""
-        return self.listener.has_events()
-
-    def pop_event(self):
-        """Returns a decoded event for the joystick."""
-        event = self.listener.pop_event() 
-        return self.profile.interpret(event)
+        event = self.listener.get_event()
+        if event:
+            return self.profile.interpret(event)
 
     def close(self):
         """Close the joystick device."""
