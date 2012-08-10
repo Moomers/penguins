@@ -58,10 +58,11 @@ class DriverHandler(SocketServer.StreamRequestHandler):
             output = 'braking initiated'
 
         elif parts[0] == 'status':
-            output = {'status':{
+            output = {
                 'driver':driver.status,
                 'arduino':self.server.arduino.status,
-                'sensors':[]}}
+                'monitor':self.server.monitor.status,
+                'sensors':[]}
 
             for name, sensor in self.server.sensors.items():
                 sensor.read()
@@ -207,6 +208,7 @@ def main():
 
     # start the server monitor thread
     server_monitor = monitor.ServerMonitor(server)
+    server.monitor = server_monitor
     server_monitor.start()
 
     # now accept requests
