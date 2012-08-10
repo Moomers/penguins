@@ -130,10 +130,6 @@ class Arduino(object):
             return False
         return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
 
-    def get_commands_sent(self):
-        """Returns how many commands we think we've sent."""
-        return self.commands_sent
-
     def start_monitor(self):
         """Starts the monitor thread that handles communication with the arduino"""
         if not self.monitor.is_alive():
@@ -280,6 +276,70 @@ def acquire(lock, timeout):
         time.sleep(.05)
 
     return False
+
+class FakeArduino(object):
+    """A fake arduino for when there's no real one"""
+    def __init__(self):
+        """Initializes a fake arduino"""
+        self.state = State(emergency_stop = True)
+        self.sensor_readings = {}
+
+    def is_healthy(self):
+        """Returns True if our link with the Arduino is healthy."""
+        # Not healthy until we've received a valid state.
+        return False
+
+    def start_monitor(self):
+        """Does nothing on this fake object"""
+        pass
+
+    def stop(self):
+        """Does nothing on this fake object"""
+        pass
+
+    def reset(self):
+        """Does nothing on this fake object"""
+        pass
+
+    @property
+    def status(self):
+        """Returns a dictionary of the arduino's status for the client"""
+        return {
+                'healthy':self.is_healthy(),
+                'estop':self.state.emergency_stop,
+                'fake':True,
+                }
+
+    def send_command(self, command):
+        """Increments the sent command count"""
+        self.state.commands_sent += 1
+        return True
+
+    def _read_data(self, timeout = None):
+        """Returns None"""
+        return None
+
+    def _parse_data(self, data):
+        """Returns None"""
+        return None
+
+    def update_state(self, timeout = 0):
+        """Updates the state timestamp"""
+        self.state.timestamp = time.time()
+        return True
+
+    def get_state(self):
+        """Returns a copy of the current state."""
+        return copy.deepcopy(self.state)
+
+    def get_sensor_reading(self, sensor_name):
+        """Gets the raw data for a particular sensor"""
+        try:
+            reading = self.sensor_readings[sensor_name]
+        except KeyError:
+            return None
+        else:
+            return copy.deepcopy(reading)
 
 if __name__ == '__main__':
     a = Arduino('/dev/ttyACM0')
