@@ -125,6 +125,7 @@ class Listener(threading.Thread):
 
     def __init__(self, device_path):
         threading.Thread.__init__(self)
+        self.setDaemon(True)
         self.device = open(device_path, 'rb', 0)
         self.events_lock = threading.Lock()
         self.last_event = None
