@@ -102,7 +102,7 @@ class Arduino(object):
             SerialError: There is a configuration error.
         """
         # Build the serial wrapper.
-        self._serial = serial.serial(port=port,
+        self._serial = serial.Serial(port=port,
                 baudrate=baud_rate, bytesize=8, parity='N', stopbits=1,
                 timeout=self.IO_TIMEOUT_SEC, writeTimeout=self.IO_TIMEOUT_SEC)
         if not self._serial.isOpen():
@@ -352,7 +352,7 @@ def find_arduino():
         try:
             desc = open('/sys/class/tty/%s/device/../product' % devname).read().strip().lower()
             if 'arduino' in desc:
-               arduinos.append(os.path.join('/dev', f))
+               arduinos.append(os.path.join('/dev', devname))
         except:
            continue
 
