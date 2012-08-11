@@ -136,8 +136,8 @@ def main():
             help="List the available drivers")
 
     opgroup = OptionGroup(parser, "Operational options")
-    opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=drivers.driverlist.keys(),
-            help="Drive using this driver [Default: smcserial]")
+    opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="sabertooth", choices=drivers.driverlist.keys(),
+            help="Drive using this driver [Default: sabertooth]")
     opgroup.add_option('-o', '--arduino', action="store", type="string", dest="arduino_port", default=None,
             help="Port of the on-board Arduino [Default: auto-locate]")
     parser.add_option_group(opgroup)
