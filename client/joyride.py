@@ -37,8 +37,11 @@ class Mixer(threading.Thread):
 
     def run(self):
         while not self._stop.isSet():
-            sound = self._queue.get()
-            self._play(sound)
+            try:
+                sound = self._queue.get(block=False, timeout=0.1)
+                self._play(sound)
+            except Queue.Empty:
+                pass
 
     def queue(self, sound):
         self._queue.put(sound)
@@ -62,12 +65,15 @@ def main():
     mixer = Mixer()
     mixer.start()
     sounds = dict((name, Sound(name))
-                  for name in ['bing', 'ebrake', 'honk', 'yay', 'screech'])
+                  for name in ['bing', 'ebrake', 'honk', 'yay', 'screech',
+                               'tada', 'uhoh'])
     js = joystick.Joystick('/dev/input/js0', joystick.NESController())
+    mixer.queue(sounds['tada'])
     last_v_left, last_v_right = 0, 0
     v_left, v_right = 0, 0
     decay = True
     estop = False
+    exit_status = 0
     try:
         while True:
             time.sleep(0.01)
@@ -124,11 +130,15 @@ def main():
             print v_left, v_right
             last_v_right = v_right
             last_v_left = v_left
-    except KeyboardInterrupt:
-        pass
+    except:
+        # Somethins' busted, bail.
+        mixer.queue(sounds['uhoh'])
+        # Give uhoh some time to happen.
+        time.sleep(0.5)
+        exit_status = 1
     js.close()
     mixer.stop()
-    return 0
+    return exit_status
 
 if __name__ == '__main__':
     sys.exit(main())

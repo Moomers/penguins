@@ -137,7 +137,7 @@ class Listener(threading.Thread):
     def run(self):
         """Listens for and queues joystick events."""
         while not self._stop.isSet():
-            rlist, _, _ = select.select([self.device], [], [], 1)
+            rlist, _, _ = select.select([self.device], [], [], 0.05)
             if not rlist:
                 # Spin to check for stop signal.
                 continue
@@ -185,15 +185,15 @@ class Joystick(object):
     def close(self):
         """Close the joystick device."""
         self.listener.stop()
-        self.listener.join()
+        self.listener.join(timeout=2)
 
 
 if __name__ == '__main__':
     js = Joystick('/dev/input/js0', NESController())
     try:
         while True:
-            if js.has_events():
-                ev = js.pop_event()
+            ev = js.get_event()
+            if ev:
                 print ev
     finally:
         js.close()
