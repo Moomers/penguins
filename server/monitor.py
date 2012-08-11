@@ -21,6 +21,10 @@ class ServerMonitor(threading.Thread):
 
             time.sleep(.05)
 
+            # brake if the client hasn't said anything for a while
+            if self.client_age() > 5:
+                self.server.driver.stop()
+
         # remove reference to the arduino (for GC)
         self.arduino = None
 
@@ -28,11 +32,14 @@ class ServerMonitor(threading.Thread):
         """Signals that the monitor thread should stop."""
         self._stop.set()
 
+    def client_age(self):
+        return round(time.time() - self.server.last_request, 1)
+
     @property
     def status(self):
         """Returns the monitor status"""
         status = {
-                'client_age':round(time.time() - self.server.last_request, 1),
+                'client_age':self.client_age(),
                 }
 
         return status
