@@ -1,4 +1,5 @@
 #! /bin/sh
+# System V style initscript for supervisord
 ### BEGIN INIT INFO
 # Provides:          supervisord
 # Required-Start:    $remote_fs
