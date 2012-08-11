@@ -68,7 +68,7 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 sensor.read()
                 status = sensor.status
                 status['name'] = name
-                output['status']['sensors'].append(status)
+                output['sensors'].append(status)
 
         elif parts[0] == 'reset':
             driver.reset()
@@ -101,11 +101,10 @@ class DriverHandler(SocketServer.StreamRequestHandler):
 
     def handle(self):
         """writes requests from the client into a queue"""
+        print "Client %s:%s connected..." % self.client_address
         try:
             while True:
                 command = self.rfile.readline().strip()
-
-                self.server.last_request = time.time()
 
                 if not command:
                     self.send_output('ok', '')
@@ -124,7 +123,9 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                     self.send_output('error', str(e))
                 else:
                     self.send_output('ok', output)
+                    self.server.last_request = time.time()
         finally:
+            print "%s:%s disconnected; stopping driver" % self.client_address
             self.server.driver.stop()
 
 def main():
@@ -138,7 +139,7 @@ def main():
     opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="smcstub", choices=drivers.driverlist.keys(),
             help="Drive using this driver [Default: smcserial]")
     opgroup.add_option('-o', '--arduino', action="store", type="string", dest="arduino_port", default=None,
-            help="Port of the on-board Arduino [Default: None (no arduino)]")
+            help="Port of the on-board Arduino [Default: auto-locate]")
     parser.add_option_group(opgroup)
 
     netgroup = OptionGroup(parser, "Network options")
@@ -179,10 +180,10 @@ def main():
     # start talking to the onboard arduino
     if options.arduino_port:
         onboard_arduino = arduino.Arduino(options.arduino_port)
-        onboard_arduino.start_monitor()
     else:
-        print "Warning: starting with a fake arduino because no arduino port was passed in!"
-        onboard_arduino = arduino.FakeArduino()
+        onboard_arduino = arduino.find_arduino()
+
+    onboard_arduino.start_monitor()
 
     # initialize the driver
     driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
@@ -202,6 +203,7 @@ def main():
 
     # create the TCP server
     server = TCPServer((options.host, options.port), DriverHandler)
+    server.last_request = time.time()
     server.arduino = onboard_arduino
     server.driver = driver
     server.sensors = sensor_list
@@ -212,6 +214,7 @@ def main():
     server_monitor.start()
 
     # now accept requests
+    print "Server initialized successfully..."
     try:
         server.serve_forever()
     except KeyboardInterrupt:
