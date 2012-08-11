@@ -72,7 +72,7 @@ def main():
         while True:
             time.sleep(0.01)
             status = penguin.status
-            arduino_status = status['status']['arduino']
+            arduino_status = status['arduino']
             if not estop and arduino_status['estop']:
                 mixer.queue(sounds['ebrake'])
                 estop = True
