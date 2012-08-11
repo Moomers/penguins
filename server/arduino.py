@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import os
 import select
 import serial
 import threading
@@ -31,6 +32,8 @@ class State(object):
         return "State(timestamp=%f, commands_sent=%d, commands_received=%d, "\
                 "bad_commands_received=%d, loops_since_command_received=%d, "\
                 "emergency_stop=%d)" % (
+                       self.timestamp,
+                       self.commands_sent,
                        self.commands_received,
                        self.bad_commands_received,
                        self.loops_since_command_received,
@@ -264,19 +267,6 @@ class Arduino(object):
         else:
             return copy.deepcopy(reading)
 
-def acquire(lock, timeout):
-    """Acquire lock with a timeout"""
-    if lock.acquire(False):
-        return True
-
-    start_time = time.time()
-    while time.time() < start_time + timeout:
-        if lock.acquire(False):
-            return True
-        time.sleep(.05)
-
-    return False
-
 class FakeArduino(object):
     """A fake arduino for when there's no real one"""
     def __init__(self):
@@ -341,8 +331,42 @@ class FakeArduino(object):
         else:
             return copy.deepcopy(reading)
 
+def acquire(lock, timeout):
+    """Acquire lock with a timeout"""
+    if lock.acquire(False):
+        return True
+
+    start_time = time.time()
+    while time.time() < start_time + timeout:
+        if lock.acquire(False):
+            return True
+        time.sleep(.05)
+
+    return False
+
+def find_arduino():
+    """returns the first arduino found; if none found, returns a fake arduino"""
+    arduinos = []
+
+    for devname in [f for f in os.listdir('/dev') if f.startswith('ttyACM')]:
+        try:
+            desc = open('/sys/class/tty/%s/device/../product' % devname).read().strip().lower()
+            if 'arduino' in desc:
+               arduinos.append(os.path.join('/dev', f))
+        except:
+           continue
+
+    if len(arduinos) == 0:
+        print "Warning: no arduino found; using fake arduino"
+        return FakeArduino()
+    else:
+        if len(arduinos) > 1:
+            print "Warning: multiple arduinos found! Using %s"
+
+        return Arduino(arduinos[0])
+
 if __name__ == '__main__':
-    a = Arduino('/dev/ttyACM0')
+    a = find_arduino()
     try:
         while True:
             time.sleep(1)
