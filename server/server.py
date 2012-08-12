@@ -1,26 +1,29 @@
 #!/usr/bin/python
 
 import SocketServer
-import drivers
 import cPickle as pickle
+from contextlib import contextmanager
+import sys
 import time
+import threading
 import traceback
 
 from optparse import OptionParser, OptionGroup
 
 import arduino
-import sensors
+import drivers
 import monitor
+import sensors
 
 class CommandError(ValueError):
     pass
 
-class TCPServer(SocketServer.TCPServer):
+class TCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     # Bind to our port even if it's in TIME_WAIT, so we can restart the
     # server right away.
     allow_reuse_address = True
 
-class DriverHandler(SocketServer.StreamRequestHandler):
+class ConnectionHandler(SocketServer.StreamRequestHandler):
     def parse_speed(self, parts):
         "parses the speed that comes over the wire into an int or None"
         try:
@@ -39,11 +42,12 @@ class DriverHandler(SocketServer.StreamRequestHandler):
 
     def process_command(self, command):
         """Processes a command from the client and returns the correct output"""
-        driver = self.server.driver
+        robot = self.server.robot
 
         parts = command.split()
+
         if parts[0] == 'stop':
-            driver.stop()
+            robot.stop()
             output = 'robot stopped'
 
         elif parts[0] == 'brake':
@@ -54,45 +58,31 @@ class DriverHandler(SocketServer.StreamRequestHandler):
             except:
                 raise CommandError("brake must be a number from 1 to 100")
 
-            driver.brake(new_speed)
+            robot.brake(new_speed)
             output = 'braking initiated'
 
         elif parts[0] == 'status':
-            output = {
-                'driver':driver.status,
-                'arduino':self.server.arduino.status,
-                'monitor':self.server.monitor.status,
-                'sensors':[]}
-
-            for name, sensor in self.server.sensors.items():
-                sensor.read()
-                status = sensor.status
-                status['name'] = name
-                output['sensors'].append(status)
+            output = robot.status
 
         elif parts[0] == 'reset':
-            driver.reset()
-            self.server.arduino.reset()
-            output = "driver reset successful"
+            robot.reset()
+            output = "robot reset successful"
 
         elif parts[0] in ('speed', 'left', 'right'):
             #try to get a number out of parts[1]
             try:
                 new_speed = self.parse_speed(parts)
-                if new_speed and (new_speed < -100 or new_speed > 100):
+                if new_speed is None or new_speed < -100 or new_speed > 100:
                     raise ValueError("out of range")
             except Exception, e:
                 raise CommandError("speed must be a number from -100 to 100, %s" % e)
 
-            #figure out which if any motor we want to deal with
+            #figure out which motor(s) we want to deal with
             motor = parts[0] if parts[0] in ('left', 'right') else 'both'
+            robot.set_speed(new_speed, motor)
 
-            if new_speed is not None:
-                driver.set_speed(new_speed, motor)
-                output = "speed set to %s" % new_speed
-            else:
-                speeds = driver.get_speed(motor)
-                output = ",".join([str(s) for s in speeds])
+            printable_motor = "%s motor" if motor in ('left', 'right') else "both motors"
+            output = "speed on %s set to %s" % (printable_motor, new_speed)
 
         else:
             raise CommandError("invalid command '%s'" % command)
@@ -100,12 +90,16 @@ class DriverHandler(SocketServer.StreamRequestHandler):
         return output
 
     def handle(self):
-        """writes requests from the client into a queue"""
-        print "Client %s:%s connected..." % self.client_address
+        """handles a single client connection"""
+        print "Client %s:%s connected" % self.client_address
+        self.controller = False
+
         try:
             while True:
                 command = self.rfile.readline().strip()
 
+                # meta commands: these control the meta operations
+                # they do not drive the robot
                 if not command:
                     self.send_output('ok', '')
                     continue
@@ -113,6 +107,22 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 if command == 'exit':
                     self.send_output('ok', 'done')
                     break
+
+                if command == 'shutdown':
+                    self.server.robot.shutdown()
+                    break
+
+                if command == 'control':
+                    if self.controller:
+                        self.send_output('ok', 'was already a controller')
+                    else:
+                        self.controller = self.server.robot.control_lock.acquire()
+                        if self.controller:
+                            self.send_output('ok', 'acquired control lock')
+                        else:
+                            self.send_output('error', 'cannot acquire control lock')
+
+                    continue
 
                 try:
                     output = self.process_command(command)
@@ -124,11 +134,121 @@ class DriverHandler(SocketServer.StreamRequestHandler):
                 else:
                     self.send_output('ok', output)
                     self.server.last_request = time.time()
+
         finally:
-            print "%s:%s disconnected; stopping driver" % self.client_address
-            self.server.driver.stop()
+            output = ["%s:%s disconnected" % self.client_address]
+            if self.controller:
+                self.server.robot.control_lock.release()
+                self.server.robot.stop()
+                output.append("; robot stopped. no more controlling client")
+            else:
+                output.append("; was a viewer")
+
+            print "".join(output)
+
+class Robot(object):
+    """Represents the robot this server is controlling"""
+    def __init__(self, driver, arduino_port = None, **options):
+        # start talking to the onboard arduino
+        if arduino_port:
+            self.arduino = arduino.Arduino(arduino_port)
+        else:
+            self.arduino = arduino.find_arduino()
+
+        # initialize the driver
+        drivermod = drivers.driverlist[driver][1]
+        self.driver = drivermod.get_driver(arduino = self.arduino, **options)
+
+        # make a list of sensors
+        self.sensors = {
+                'Battery voltage':sensors.VoltageSensor(self.arduino, 'BV', 100000, 10000),
+                'Driver temperature':sensors.TemperatureSensor(self.arduino, 'DT'),
+                'Left sonar':sensors.Sonar(self.arduino, 'LS'),
+                'Right sonar':sensors.Sonar(self.arduino, 'RS'),
+                'Left encoder':sensors.Encoder(self.arduino, 'LE'),
+                'Right encoder':sensors.Encoder(self.arduino, 'RE'),
+                }
+
+        # create the TCP server
+        self.server = TCPServer((options['host'], options['port']), ConnectionHandler)
+        self.server.last_request = 0
+        self.server.robot = self
+
+        # create the monitor
+        self.monitor = monitor.ServerMonitor(self)
+
+        # used to limit control of the robot to a single controlling thread
+        self.control_lock = threading.RLock()
+        # keep track of when the last command was issued to the robot
+        self.last_control = 0
+
+    def start(self):
+        """Starts all the robot components and monitors and begin accepting requests"""
+        self.arduino.start_monitor()
+        self.monitor.start()
+        self.server.serve_forever()
+
+    def shutdown(self):
+        """Stop accepting new requests, talking to the arduino, or moving"""
+        self.server.shutdown()
+
+        self.driver.stop()
+        self.monitor.stop()
+        self.arduino.stop()
+
+    @property
+    def status(self):
+        """Return the status of the robot"""
+        status = {
+                'driver':self.driver.status,
+                'arduino':self.arduino.status,
+                'monitor':self.monitor.status,
+                'sensors':[]}
+
+        for name, sensor in self.sensors.items():
+            sensor_status = sensor.status
+            sensor_status['name'] = name
+            status['sensors'].append(sensor_status)
+
+        return status
+
+    def reset(self):
+        """Reset all of the components to a known initialized state"""
+        with self._lock():
+            self.driver.reset()
+            self.arduino.reset()
+
+    def stop(self):
+        """Stops the robot"""
+        with self._lock():
+            self.driver.stop()
+
+    def brake(self, speed):
+        """initiates braking"""
+        with self._lock():
+            self.driver.brake(speed)
+
+    def set_speed(self, speed, motor):
+        """sets the speed on one or both motors"""
+        with self._lock():
+            self.driver.set_speed(speed, motor)
+
+    @contextmanager
+    def _lock(self):
+        """Utility function to protect control operations"""
+        locked = self.control_lock.acquire(blocking = 0)
+        if locked:
+            try:
+                yield
+            finally:
+                self.last_control = time.time()
+                self.control_lock.release()
+        else:
+            raise Exception("Another thread is currently controlling the robot")
+
 
 def main():
+    """Parses command-line options and starts the robot-controlling server"""
     parser = OptionParser()
     parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
             help="Print more debug info")
@@ -162,69 +282,38 @@ def main():
     # parse the arguments
     options, args = parser.parse_args()
 
-    # if we requested a driver list, list drivers and then exit
+    list_and_exit = False
     if options.list:
+        list_and_exit = True
+    else:
+        # make sure we specified a valid driver
+        if not options.driver:
+            print "You must specify a driver!"
+            list_and_exit = True
+        elif options.driver not in drivers.driverlist:
+            print "Invalid driver specified: %s" % options.driver
+            list_and_exit = True
+
+    # if we requested a driver list, list drivers and then exit
+    if list_and_exit:
         print "Available drivers:"
         for name, info in drivers.driverlist.items():
             print "%s %s" % (name.ljust(30), info[0])
 
         return 0
 
-    # try to get the driver
+    # otherwise, try to create the robot and then start the servers
+    robot = Robot(**vars(options))
+    print "Robot initialized successfully..."
+
+    # start the robot and begin accepting requests
     try:
-        drivermod = drivers.driverlist[options.driver][1]
-    except:
-        parser.error("You must specify a driver")
-
-    # we got a valid driver, lets initialize the robot
-    # start talking to the onboard arduino
-    if options.arduino_port:
-        onboard_arduino = arduino.Arduino(options.arduino_port)
-    else:
-        onboard_arduino = arduino.find_arduino()
-
-    onboard_arduino.start_monitor()
-
-    # initialize the driver
-    driver = drivermod.get_driver(arduino = onboard_arduino, **vars(options))
-
-    # make a list of sensors
-    sensor_list = {
-            'Battery voltage':sensors.VoltageSensor(onboard_arduino, 'BV', 100000, 10000),
-            'Driver temperature':sensors.TemperatureSensor(onboard_arduino, 'DT'),
-            'Left sonar':sensors.Sonar(onboard_arduino, 'LS'),
-            'Right sonar':sensors.Sonar(onboard_arduino, 'RS'),
-            'Left encoder':sensors.Encoder(onboard_arduino, 'LE'),
-            'Right encoder':sensors.Encoder(onboard_arduino, 'RE'),
-            }
-
-    # start the arduino monitor thread
-    onboard_arduino.start_monitor()
-
-    # create the TCP server
-    server = TCPServer((options.host, options.port), DriverHandler)
-    server.last_request = time.time()
-    server.arduino = onboard_arduino
-    server.driver = driver
-    server.sensors = sensor_list
-
-    # start the server monitor thread
-    server_monitor = monitor.ServerMonitor(server)
-    server.monitor = server_monitor
-    server_monitor.start()
-
-    # now accept requests
-    print "Server initialized successfully..."
-    try:
-        server.serve_forever()
+        robot.start()
     except KeyboardInterrupt:
         return 0
     finally:
-        print "Shutting down"
-        server.server_close()
-        driver.stop()
-        server_monitor.stop()
-        onboard_arduino.stop()
+        print "Shutting down..."
+        robot.shutdown()
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
