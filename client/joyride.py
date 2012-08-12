@@ -18,6 +18,9 @@ TURN_ACCEL = 5
 DECAY = 0.94
 SOUND_DIR = '../sounds/joyride'
 
+LEFT_ADJUST = 1.1
+RIGHT_ADJUST = 1
+
 class Sound(object):
     def __init__(self, name):
         self.wf = wave.open(os.path.join(SOUND_DIR, name + '.wav'), 'rb')
@@ -88,9 +91,9 @@ def temp_critical(sensors, cur_critical):
     """Returns True if we're overtemperature."""
     try:
         if cur_critical:
-            return sensors['Driver temperature']['value'] > 25
+            return sensors['Driver temperature']['value'] > 35
         else:
-            return sensors['Driver temperature']['value'] > 30
+            return sensors['Driver temperature']['value'] > 50
     except KeyError:
         return False
 
@@ -167,6 +170,8 @@ def main():
                     mixer.queue(SOUNDS['screech'])
                     # emergency stop for now
                     penguin.stop()
+                    v_left = 0
+                    v_right = 0
                 elif type(ev) == commands.Drive:
                     if ev.speed == -1: # go forward
                        v_left += ACCEL
@@ -188,21 +193,31 @@ def main():
                 elif type(ev) == commands.Reset and not ev.pressed:
                     # issue reset when the button is released.
                     penguin.reset()
+            def clamp(vel):
+                if vel < -MAX_VEL: return -MAX_VEL
+                elif vel > MAX_VEL: return MAX_VEL
+                return vel
+
             if decay:
                v_left *= DECAY
                v_right *= DECAY
-            if v_left < -MAX_VEL: v_left = -MAX_VEL
-            if v_right < -MAX_VEL: v_right = -MAX_VEL
-            if v_left > MAX_VEL: v_left = MAX_VEL
-            if v_right > MAX_VEL: v_right = MAX_VEL
-            if v_left != last_v_left:
-               penguin.left = int(v_left)
-            if v_right != last_v_right:
-               penguin.right = int(v_right)
-            if abs(v_left) < 1: v_left = 0
-            if abs(v_right) < 1: v_right = 0
-            last_v_right = v_right
-            last_v_left = v_left
+
+            clamped_v_left = clamp(int(v_left * LEFT_ADJUST))
+            clamped_v_right = clamp(int(v_right * RIGHT_ADJUST))
+
+            if clamped_v_left != last_v_left:
+               penguin.left = clamped_v_left
+            if clamped_v_right != last_v_right:
+               penguin.right = clamped_v_right
+
+            # set the speed to 0 when it's really low
+            if abs(v_left) < 3: v_left = 0
+            if abs(v_right) < 3: v_right = 0
+
+            #save previous speed
+            last_v_right = clamped_v_right
+            last_v_left = clamped_v_left
+
     except KeyboardInterrupt:
         mixer.queue(SOUNDS['uhoh'])
         time.sleep(0.5)
