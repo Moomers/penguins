@@ -89,7 +89,7 @@ struct SerialCommand {
     NONE = 0,
     HEARTBEAT = 1,
     VELOCITY = 2,
-    RESET = 3,
+    GO = 3,
     GETSTATE = 4,
     STOP = 5,
   };
@@ -151,6 +151,9 @@ void setup()
   pinMode(WarnLEDPin, OUTPUT);
   pinMode(RunLEDPin, OUTPUT);
 
+  // turn on the warn led to indicate a recent reset
+  digitalWrite(WarnLEDPin, HIGH);
+
   // go into emergency stop to begin with
   emergency_stop();
 }
@@ -185,6 +188,7 @@ void loop()
     state.loopsSinceLastCommand = 0;
     state.commandsReceived++;
     execute_command(cmd);
+    digitalWrite(WarnLEDPin, LOW);
   }
 }
 
@@ -206,7 +210,7 @@ void execute_command(const SerialCommand& cmd)
     state.loopsSinceStateSent = LoopsBetweenStateSend;
   }
 
-  if (cmd.type == SerialCommand::RESET) {
+  if (cmd.type == SerialCommand::GO) {
     state.emergencyStop = false;
     digitalWrite(StoppedLEDPin, LOW);
   }
@@ -341,7 +345,7 @@ SerialCommand parse_command_buffer(const char* buf, int len)
   // V<left>,<right>\n  -- set motor velocities, int in [-63, 63]
   // H\n                -- heartbeat
   // S\n                -- causes an immediate send of the current state
-  // R\n                -- reset (clears an emergency stop)
+  // G\n                -- go (clears an emergency stop)
   // X\n                -- stop (causes an emergency stop to occur)
 
   SerialCommand cmd;
@@ -349,8 +353,8 @@ SerialCommand parse_command_buffer(const char* buf, int len)
   case 'H': 
     cmd.type = SerialCommand::HEARTBEAT;
     break;
-  case 'R':
-    cmd.type = SerialCommand::RESET;
+  case 'G':
+    cmd.type = SerialCommand::GO;
     break;
   case 'S':
     cmd.type = SerialCommand::GETSTATE;
@@ -417,6 +421,4 @@ void toggle_led()
     digitalWrite(RunLEDPin, HIGH);
     state.runLED = true;
   }
-
-
 }
