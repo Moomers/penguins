@@ -95,7 +95,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
         self.controller = False
 
         try:
-            while True:
+            while not self.server.robot.is_shutting_down.is_set():
                 command = self.rfile.readline().strip()
 
                 # meta commands: these control the meta operations
@@ -182,6 +182,9 @@ class Robot(object):
         # keep track of when the last command was issued to the robot
         self.last_control = 0
 
+        # an event for when  the penguin is shutting down
+        self.is_shutting_down = threading.Event()
+
     def start(self):
         """Starts all the robot components and monitors and begin accepting requests"""
         self.arduino.start_monitor()
@@ -190,6 +193,7 @@ class Robot(object):
 
     def shutdown(self):
         """Stop accepting new requests, talking to the arduino, or moving"""
+        self.is_shutting_down.set()
         self.server.shutdown()
 
         self.driver.stop()
