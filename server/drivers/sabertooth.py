@@ -19,7 +19,7 @@ class SabertoothDriver(object):
     ###### the interface of the driver #####
     def go(self):
         """Puts the controller into a basic run state"""
-        self.robot.arduino.send_command('R')
+        self.robot.arduino.send_command('G')
 
     def stop(self):
         """Stops the robot"""
