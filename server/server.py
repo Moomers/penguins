@@ -148,25 +148,24 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
 
 class Robot(object):
     """Represents the robot this server is controlling"""
-    def __init__(self, driver, arduino_port = None, **options):
-        # start talking to the onboard arduino
-        if arduino_port:
-            self.arduino = arduino.Arduino(arduino_port)
-        else:
-            self.arduino = arduino.find_arduino()
+    def __init__(self, driver, arduino_serial = None, **options):
+        self.arduino_serial = arduino_serial
+
+        # temporary arduino object; it may be replaced in the reset() function
+        self.arduino = arduino.FakeArduino()
 
         # initialize the driver
         drivermod = drivers.driverlist[driver][1]
-        self.driver = drivermod.get_driver(arduino = self.arduino, **options)
+        self.driver = drivermod.get_driver(robot = self, **options)
 
         # make a list of sensors
         self.sensors = {
-                'Battery voltage':sensors.VoltageSensor(self.arduino, 'BV', 100000, 10000),
-                'Driver temperature':sensors.TemperatureSensor(self.arduino, 'DT'),
-                'Left sonar':sensors.Sonar(self.arduino, 'LS'),
-                'Right sonar':sensors.Sonar(self.arduino, 'RS'),
-                'Left encoder':sensors.Encoder(self.arduino, 'LE'),
-                'Right encoder':sensors.Encoder(self.arduino, 'RE'),
+                'Battery voltage':sensors.VoltageSensor(self, 'BV', 100000, 10000),
+                'Driver temperature':sensors.TemperatureSensor(self, 'DT'),
+                'Left sonar':sensors.Sonar(self, 'LS'),
+                'Right sonar':sensors.Sonar(self, 'RS'),
+                'Left encoder':sensors.Encoder(self, 'LE'),
+                'Right encoder':sensors.Encoder(self, 'RE'),
                 }
 
         # create the TCP server
@@ -187,7 +186,8 @@ class Robot(object):
 
     def start(self):
         """Starts all the robot components and monitors and begin accepting requests"""
-        self.arduino.start_monitor()
+        self.reset()
+
         self.monitor.start()
         self.server.serve_forever()
 
@@ -219,8 +219,13 @@ class Robot(object):
     def reset(self):
         """Reset all of the components to a known initialized state"""
         with self._lock():
+            if self.arduino:
+                self.arduino.stop()
+
+            self.arduino = arduino.find_arduino(self.arduino_serial)
+            self.arduino.start_monitor()
+
             self.driver.reset()
-            self.arduino.reset()
 
     def stop(self):
         """Stops the robot"""
@@ -262,8 +267,8 @@ def main():
     opgroup = OptionGroup(parser, "Operational options")
     opgroup.add_option('-d', '--driver', action="store", type="choice", dest="driver", default="sabertooth", choices=drivers.driverlist.keys(),
             help="Drive using this driver [Default: sabertooth]")
-    opgroup.add_option('-o', '--arduino', action="store", type="string", dest="arduino_port", default=None,
-            help="Port of the on-board Arduino [Default: auto-locate]")
+    opgroup.add_option('-s', '--arduino', action="store", type="string", dest="arduino_serial", default=None,
+            help="Serial number of the on-board arduino [Default: Pick a random one]")
     parser.add_option_group(opgroup)
 
     netgroup = OptionGroup(parser, "Network options")
