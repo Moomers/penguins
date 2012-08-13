@@ -152,11 +152,6 @@ class Arduino(object):
         # close the serial port
         self._serial.close()
 
-    def reset(self):
-        """Resets the arduino"""
-        # TODO: stop the monitor to free the serial port, then do whatever flashing does to reboot
-        pass
-
     @property
     def status(self):
         """Returns a dictionary of the arduino's status for the client"""
@@ -284,10 +279,6 @@ class FakeArduino(object):
         pass
 
     def stop(self):
-        """Does nothing on this fake object"""
-        pass
-
-    def reset(self):
         """Does nothing on this fake object"""
         pass
 
