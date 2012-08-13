@@ -113,7 +113,10 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
                     break
 
                 if command == 'shutdown':
-                    self.server.robot.shutdown()
+                    self.send_output('ok', 'shutdown')
+                    self.server.shutdown()
+                    # the main thread will shut down the robot when it
+                    # dies (this thread can't if it's not a controller.)
                     break
 
                 if command == 'control':
