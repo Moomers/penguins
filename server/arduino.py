@@ -351,21 +351,24 @@ def find_arduino(serial):
         except:
            continue
 
-    if len(arduinos) == 0:
-        print "Warning: no arduino found; using fake arduino"
-        return FakeArduino()
+    # if a serial number is passed in always require a particular arduino
+    if serial:
+        matching = [a for a in arduinos if a['serial'] == serial]
+        if len(matching) == 0:
+            raise Exception("No arduino with serial number %s found" % serial)
+        elif len(matching) > 1:
+            raise Exception("Multiple arduinos with serial number %s found!" % serial)
+        else:
+            return Arduino(matching[0]['device'])
+
+    # if no serial number passed, pick any old random arduino, including a fake one
     else:
-        if serial:
-            matching = [arduino for arduino in arduinos if arduino['serial'] == serial]
-            if len(matching) == 0:
-                raise Exception("No arduino with serial number %s found" % serial)
-            elif len(matching) > 1:
-                raise Exception("Multiple arduinos with serial number %s found!" % serial)
-            else:
-                return Arduino(matching[0]['device'])
+        if len(arduinos) == 0:
+            print "Warning: no arduino found; using fake arduino"
+            return FakeArduino()
         else:
             if len(arduinos) > 1:
-                print "Warning: multiple arduinos found! Using %s"
+                print "Warning: multiple arduinos found! Using %s" % arduinos[0]['name']
 
             return Arduino(arduinos[0]['device'])
 
