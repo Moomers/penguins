@@ -8,24 +8,24 @@ class Sensor(object):
     pass
 
 class ArduinoConnectedSensor(Sensor):
-    """A sensor connected to the on-board arduino"""
-    def __init__(self, arduino, key):
+    """A sensor connected to the on-board arduino on the robot"""
+    def __init__(self, robot, key):
         Sensor.__init__(self)
 
-        self.arduino = arduino
+        self.robot = robot
         self.key = key
 
     def _read(self):
         try:
-            reading = self.arduino.sensor_readings[self.key]
+            reading = self.robot.arduino.sensor_readings[self.key]
             return reading
         except KeyError:
             return None
 
 class VoltageSensor(ArduinoConnectedSensor):
     """An analog sensor for determining voltage; uses a voltage divider on the arduino"""
-    def __init__(self, arduino, key, R1 = 1, R2 = 1):
-        ArduinoConnectedSensor.__init__(self, arduino, key)
+    def __init__(self, robot, key, R1 = 1, R2 = 1):
+        ArduinoConnectedSensor.__init__(self, robot, key)
 
         self.voltage = None
 
@@ -48,8 +48,8 @@ class VoltageSensor(ArduinoConnectedSensor):
 
 class TemperatureSensor(ArduinoConnectedSensor):
     """A TMP36 connected to the arduino"""
-    def __init__(self, arduino, key, scaling_function = lambda voltage: (voltage - 500) / 10):
-        ArduinoConnectedSensor.__init__(self, arduino, key)
+    def __init__(self, robot, key, scaling_function = lambda voltage: (voltage - 500) / 10):
+        ArduinoConnectedSensor.__init__(self, robot, key)
         self.scaling_function = scaling_function
 
     def read(self):
@@ -68,8 +68,8 @@ class TemperatureSensor(ArduinoConnectedSensor):
 
 class Sonar(ArduinoConnectedSensor):
     """An LV-MaxSonar -EZ1 connected to the Arduino (via PWM)"""
-    def __init__(self, arduino, key):
-        ArduinoConnectedSensor.__init__(self, arduino, key)
+    def __init__(self, robot, key):
+        ArduinoConnectedSensor.__init__(self, robot, key)
 
     def read(self):
         reading = self._read()
@@ -86,8 +86,8 @@ class Sonar(ArduinoConnectedSensor):
 
 class Encoder(ArduinoConnectedSensor):
     """A magnetic encoder reading the wheel speed via a hall effect sensor"""
-    def __init__(self, arduino, key, magnets = 2, window = 10):
-        ArduinoConnectedSensor.__init__(self, arduino, key)
+    def __init__(self, robot, key, magnets = 2, window = 10):
+        ArduinoConnectedSensor.__init__(self, robot, key)
 
         self.magnets = magnets
         self.window = window
