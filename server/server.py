@@ -73,6 +73,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
 
         elif parts[0] == 'status':
             output = robot.status
+            output['monitor'] = self.server.monitor.status
 
         elif parts[0] == 'reset':
             robot.reset()
@@ -201,7 +202,6 @@ class Robot(object):
         status = {
                 'driver':self.driver.status,
                 'arduino':self.arduino.status,
-                'monitor':self.monitor.status,
                 'sensors':[]}
 
         for name, sensor in self.sensors.items():
@@ -324,6 +324,8 @@ def main():
     # create the monitor
     server_monitor = monitor.ServerMonitor(server, robot)
     server_monitor.start()
+    # so we can report status
+    server.monitor = server_monitor
 
     # start the robot and begin accepting requests
     print "Starting server..."
