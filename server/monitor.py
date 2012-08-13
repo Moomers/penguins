@@ -4,9 +4,10 @@ import time
 import threading
 
 class ServerMonitor(threading.Thread):
-    """Monitors the server and takes action on exceptional conditions"""
-    def __init__(self, robot):
+    """Monitors the server and robot and takes action on exceptional conditions"""
+    def __init__(self, server, robot):
         threading.Thread.__init__(self)
+        self.server = server
         self.robot = robot
 
         # used to stop the monitor thread
@@ -31,7 +32,7 @@ class ServerMonitor(threading.Thread):
 
     def client_age(self):
         """Time since last client request to the robot's server"""
-        return round(time.time() - self.robot.server.last_request, 2)
+        return round(time.time() - self.server.last_request, 2)
 
     def control_age(self):
         """Time since last control command to the robot"""

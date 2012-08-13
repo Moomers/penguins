@@ -95,7 +95,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
         self.controller = False
 
         try:
-            while not self.server.robot.is_shutting_down.is_set():
+            while not self.server.is_shutting_down.is_set():
                 command = self.rfile.readline().strip()
 
                 # meta commands: these control the meta operations
@@ -168,36 +168,14 @@ class Robot(object):
                 'Right encoder':sensors.Encoder(self, 'RE'),
                 }
 
-        # create the TCP server
-        self.server = TCPServer((options['host'], options['port']), ConnectionHandler)
-        self.server.last_request = 0
-        self.server.robot = self
-
-        # create the monitor
-        self.monitor = monitor.ServerMonitor(self)
-
         # used to limit control of the robot to a single controlling thread
         self.control_lock = threading.RLock()
         # keep track of when the last command was issued to the robot
         self.last_control = 0
 
-        # an event for when  the penguin is shutting down
-        self.is_shutting_down = threading.Event()
-
-    def start(self):
-        """Starts all the robot components and monitors and begin accepting requests"""
-        self.reset()
-
-        self.monitor.start()
-        self.server.serve_forever()
-
     def shutdown(self):
         """Stop accepting new requests, talking to the arduino, or moving"""
-        self.is_shutting_down.set()
-        self.server.shutdown()
-
         self.driver.stop()
-        self.monitor.stop()
         self.arduino.stop()
 
     @property
@@ -313,16 +291,32 @@ def main():
 
     # otherwise, try to create the robot and then start the servers
     robot = Robot(**vars(options))
+    robot.reset()
     print "Robot initialized successfully..."
 
+    # create the robot
+    server = TCPServer((options.host, options.port), ConnectionHandler)
+    server.last_request = 0
+    server.robot = robot
+    server.is_shutting_down = threading.Event()
+
+    # create the monitor
+    server_monitor = monitor.ServerMonitor(server, robot)
+    server_monitor.start()
+
     # start the robot and begin accepting requests
+    print "Starting server..."
     try:
-        robot.start()
+        server.serve_forever()
     except KeyboardInterrupt:
         return 0
     finally:
         print "Shutting down..."
+        server.is_shutting_down.set()
+        server_monitor.stop()
+        server.shutdown()
         robot.shutdown()
+
 
 if __name__ == "__main__":
     sys.exit(main())
