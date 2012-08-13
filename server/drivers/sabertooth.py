@@ -5,8 +5,8 @@ import common
 class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
 
-    def __init__(self, arduino):
-        self.arduino = arduino
+    def __init__(self, robot):
+        self.robot = robot
         self.speeds = (0, 0)
 
     def _convert_speed(self, speed):
@@ -19,11 +19,11 @@ class SabertoothDriver(object):
     ###### the interface of the driver #####
     def reset(self):
         """Resets the controller into a basic run state"""
-        self.arduino.send_command('R')
+        self.robot.arduino.send_command('R')
 
     def stop(self):
         """Stops the robot"""
-        self.arduino.send_command('X')
+        self.robot.arduino.send_command('X')
 
     def brake(self, speed):
         """Applies braking to the motors"""
@@ -41,7 +41,7 @@ class SabertoothDriver(object):
         elif motor == 'right':
             self.speeds = (old_left, speed)
 
-        self.arduino.send_command('V%d,%d' % (self.right, self.left))
+        self.robot.arduino.send_command('V%d,%d' % (self.right, self.left))
 
     def get_speed(self, motor = 'both'):
         """Returns the current speed of a motor"""
@@ -70,8 +70,5 @@ class SabertoothDriver(object):
                 'right':self.speeds[1],
                 }
 
-def get_driver(arduino, **rest):
-    if not arduino:
-        raise common.DriverError("The sabertooth driver requires a connection to an onboard Arduino to function")
-
-    return SabertoothDriver(arduino)
+def get_driver(robot, **rest):
+    return SabertoothDriver(robot)
