@@ -154,7 +154,7 @@ class Arduino(object):
 
     def reset(self):
         """Resets the arduino"""
-        # TODO
+        # TODO: stop the monitor to free the serial port, then do whatever flashing does to reboot
         pass
 
     @property
@@ -344,7 +344,7 @@ def acquire(lock, timeout):
 
     return False
 
-def find_arduino():
+def find_arduino(serial):
     """returns the first arduino found; if none found, returns a fake arduino"""
     arduinos = []
 
@@ -352,7 +352,11 @@ def find_arduino():
         try:
             desc = open('/sys/class/tty/%s/device/../product' % devname).read().strip().lower()
             if 'arduino' in desc:
-               arduinos.append(os.path.join('/dev', devname))
+               arduinos.append({
+                   'name':devname,
+                   'device':os.path.join('/dev', devname),
+                   'serial':open('/sys/class/tty/%s/device/../serial' % devname).read().strip().lower(),
+                   })
         except:
            continue
 
@@ -360,10 +364,19 @@ def find_arduino():
         print "Warning: no arduino found; using fake arduino"
         return FakeArduino()
     else:
-        if len(arduinos) > 1:
-            print "Warning: multiple arduinos found! Using %s"
+        if serial:
+            matching = [arduino for arduino in arduinos if arduino['serial'] == serial]
+            if len(matching) == 0:
+                raise Exception("No arduino with serial number %s found" % serial)
+            elif len(matching) > 1:
+                raise Exception("Multiple arduinos with serial number %s found!" % serial)
+            else:
+                return Arduino(matching[0]['device'])
+        else:
+            if len(arduinos) > 1:
+                print "Warning: multiple arduinos found! Using %s"
 
-        return Arduino(arduinos[0])
+            return Arduino(arduinos[0]['device'])
 
 if __name__ == '__main__':
     a = find_arduino()
