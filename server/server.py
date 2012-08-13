@@ -151,8 +151,8 @@ class Robot(object):
     def __init__(self, driver, arduino_serial = None, **options):
         self.arduino_serial = arduino_serial
 
-        # temporary arduino object; it may be replaced in the reset() function
-        self.arduino = arduino.FakeArduino()
+        # a real arduino is found during reset()
+        self.arduino = None
 
         # initialize the driver
         drivermod = drivers.driverlist[driver][1]
