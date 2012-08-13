@@ -22,6 +22,16 @@ class TCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     # Bind to our port even if it's in TIME_WAIT, so we can restart the
     # server right away.
     allow_reuse_address = True
+    # Don't wait for all threads before dying, just die.
+    daemon_threads = True
+
+    def __init__(self, sockaddr, handler):
+        SocketServer.TCPServer.__init__(self, sockaddr, handler)
+        self.is_shutting_down = threading.Event()
+
+    def shutdown(self):
+        self.is_shutting_down.set()
+        SocketServer.TCPServer.shutdown(self)
 
 class ConnectionHandler(SocketServer.StreamRequestHandler):
     def parse_speed(self, parts):
@@ -310,7 +320,6 @@ def main():
     server = TCPServer((options.host, options.port), ConnectionHandler)
     server.last_request = 0
     server.robot = robot
-    server.is_shutting_down = threading.Event()
 
     # create the monitor
     server_monitor = monitor.ServerMonitor(server, robot)
@@ -324,7 +333,6 @@ def main():
         return 0
     finally:
         print "Shutting down..."
-        server.is_shutting_down.set()
         server_monitor.stop()
         server.shutdown()
         robot.shutdown()
