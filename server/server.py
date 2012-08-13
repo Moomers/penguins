@@ -68,6 +68,10 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
             robot.reset()
             output = "robot reset successful"
 
+        elif parts[0] == 'go':
+            robot.go()
+            output = "robot ready to run"
+
         elif parts[0] in ('speed', 'left', 'right'):
             #try to get a number out of parts[1]
             try:
@@ -203,7 +207,12 @@ class Robot(object):
             self.arduino = arduino.find_arduino(self.arduino_serial)
             self.arduino.start_monitor()
 
-            self.driver.reset()
+            self.driver.stop()
+
+    def go(self):
+        """Puts the robot in go mode"""
+        with self._lock():
+            self.driver.go()
 
     def stop(self):
         """Stops the robot"""

@@ -17,8 +17,8 @@ class SabertoothDriver(object):
         return speed * 63 / 100
 
     ###### the interface of the driver #####
-    def reset(self):
-        """Resets the controller into a basic run state"""
+    def go(self):
+        """Puts the controller into a basic run state"""
         self.robot.arduino.send_command('R')
 
     def stop(self):
