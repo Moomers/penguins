@@ -6,6 +6,8 @@ import serial
 import time
 import threading
 
+from parameters import monitor as mp
+
 def touch(fname, times = None):
     fhandle = file(fname, 'a')
     try:
@@ -19,11 +21,15 @@ class ServerMonitor(threading.Thread):
         threading.Thread.__init__(self)
         self.server = server
         self.robot = robot
+
+        # used to reduce log verbosity by only alerting once
+        # for each type of problem
         self.log_estop = True
         self.log_slowdown = True
         self.log_control_estop = True
         self.log_arduino_unhealthy = True
         self.log_failed_reset = True
+
         self.last_reset_attempt = 0
         self.last_touched = 0
 
@@ -43,7 +49,7 @@ class ServerMonitor(threading.Thread):
                         logging.warn('arduino became unhealthy!')
                         self.log_arduino_unhealthy = False
 
-                    if time.time() - self.last_reset_attempt > .5:
+                    if time.time() - self.last_reset_attempt > mp['time_between_reset_attempts']:
                         try:
                             self.robot.reset()
                         except:
@@ -57,7 +63,7 @@ class ServerMonitor(threading.Thread):
                         logging.info("arduino becomes healthy again!")
 
                 # brake if the client hasn't said anything for a while
-                if self.client_age() > 5:
+                if self.client_age() > mp['client_timeout']:
                     # print out this log message once per timeout
                     if self.log_estop:
                         logging.error('monitor estop; client_age %.4f' % (
@@ -68,16 +74,16 @@ class ServerMonitor(threading.Thread):
                     self.log_estop = True
 
                 # slow down if client hasn't issued control commands for a while
-                if self.control_age() > 2.5 and not (
+                if self.control_age() > mp['control_timeout_brake'] and not (
                         self.robot.driver.braking_speed or self.robot.arduino.status['estop']):
                     if self.log_slowdown:
                         logging.warn('braking; control_age %.4f' % (
                                 self.control_age(),))
 
-                    self.robot.driver.brake(3)
+                    self.robot.driver.brake(mp['timeout_brake_speed'])
                     self.log_slowdown = False
                 # emergency brake if still no control.
-                elif self.control_age() > 5 and not self.robot.arduino.status['estop']:
+                elif self.control_age() > mp['control_timeout_stop'] and not self.robot.arduino.status['estop']:
                     if self.log_control_estop:
                         logging.warn('controlled estop; control_age %.4f' % (
                             self.control_age(),))
@@ -88,14 +94,15 @@ class ServerMonitor(threading.Thread):
                     self.log_control_estop = True
 
                 # touch a file every so often to tell watchdog we're still here
-                if time.time() - self.last_touched > 1:
-                    touch('/tmp/server-monitor-alive')
+                if time.time() - self.last_touched > mp['file_touch_interval']:
+                    touch(mp['file_touch_path'])
                     self.last_touched = time.time()
 
                 # send new robot speed
                 self.robot.driver.update_speed()
 
-                time.sleep(.05)
+                time.sleep(mp['loop_min_interval'])
+
             except serial.SerialException:
                 if self.robot.arduino.is_healthy():
                     logging.exception("Unexpected serial error while arduino is healthy")

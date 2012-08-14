@@ -160,8 +160,14 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
 
                 try:
                     output = self.process_command(command)
+
+                # got an invalid command (could not parse
                 except CommandError, e:
                     self.send_output('invalid', e.message)
+                # driver rejected the command, but not due to an error
+                except (driver.common.ParameterError, driver.common.StoppedError), e:
+                    self.send_output('rejected', e.message)
+                # unknown error -- send error to the client, and log the exception
                 except Exception, e:
                     traceback.print_exc()
                     self.send_output('error', str(e))
