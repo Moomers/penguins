@@ -62,7 +62,10 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
             output = 'braking initiated'
 
         elif parts[0] == 'status':
-            output = robot.status
+            status = robot.status
+            status['monitor'] = self.server.monitor.status
+
+            output = status
 
         elif parts[0] == 'reset':
             robot.reset()
@@ -113,7 +116,8 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
                     break
 
                 if command == 'shutdown':
-                    self.server.robot.shutdown()
+                    self.server.shutdown()
+                    self.send_output('ok', 'shutting down')
                     break
 
                 if command == 'control':
@@ -178,7 +182,7 @@ class Robot(object):
         self.last_control = 0
 
     def shutdown(self):
-        """Stop accepting new requests, talking to the arduino, or moving"""
+        """Stop talking to the arduino or moving"""
         self.driver.stop()
         self.arduino.stop()
 
@@ -188,7 +192,6 @@ class Robot(object):
         status = {
                 'driver':self.driver.status,
                 'arduino':self.arduino.status,
-                'monitor':self.monitor.status,
                 'sensors':[]}
 
         for name, sensor in self.sensors.items():
@@ -311,6 +314,7 @@ def main():
 
     # create the monitor
     server_monitor = monitor.ServerMonitor(server, robot)
+    server.monitor = server_monitor
     server_monitor.start()
 
     # start the robot and begin accepting requests
