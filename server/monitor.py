@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import threading
+from math import copysign
 
 def touch(fname, times = None):
     fhandle = file(fname, 'a')
@@ -48,8 +49,8 @@ class ServerMonitor(threading.Thread):
             # for a while and is trying to go faster than this.
             # the driver is responsible for decelerating smoothly.
             if (self.control_age() > 2.5 and
-                (self.robot.driver.status['target left'] > 10 or
-                 self.robot.driver.status['target right'] > 10)):
+                (abs(self.robot.driver.status['target left']) > 10 or
+                 abs(self.robot.driver.status['target right']) > 10)):
                 if self.log_slowdown:
                     logging.error('controlled slowdown; control_age %.4f' % (
                             self.control_age(),))

@@ -35,10 +35,10 @@ class RawEvent(object):
     @staticmethod
     def Unpack(data):
         """Unpacks data from the joystick.
-        
+
         Args:
             data: A string with raw joystick input.
-            
+
         Returns:
             A RawEvent with decoded data.
         """
@@ -69,7 +69,7 @@ class Profile(object):
     def __init__(self,
                  steering_axis=-1, left=0, center=0, right=0,
                  drive_axis=-1, forward=0, still=0, reverse=0,
-                 brake_button=-1, horn_button=-1, reset_button=-1):
+                 stop_button=-1, horn_button=-1, go_button=-1):
         """Creates a joystick profile.
 
         Args:
@@ -81,28 +81,28 @@ class Profile(object):
             forward: Drive value for full ahead.
             still: Drive value for stand still.
             reverse: Drive value for full reverse.
-            brake_button: The button that means brake.
+            stop_button: The button that means stop.
             horn_button: The button that means honk.
-            reset_button: The button that resets the penguin.
+            go_button: The button that starts the penguin.
         """
         self.steering_axis = steering_axis
         self.steering = (left, center, right)
         self.drive_axis = drive_axis
         self.drive = (forward, still, reverse)
-        self.brake_button = brake_button
+        self.stop_button = stop_button
         self.horn_button = horn_button
-        self.reset_button = reset_button
+        self.go_button = go_button
 
     def interpret(self, event):
         """Interprets a raw event as a comand."""
         # Ignore init events.
         if event.event_type == RawEvent.BUTTON:
-            if event.number == self.brake_button:
-                return commands.Brake(event.value)
-            elif event.number == self.horn_button:
-                return commands.Horn(event.value)
-            elif event.number == self.reset_button:
-                return commands.Reset(event.value)
+            if event.number == self.stop_button and event.value:
+                return commands.Stop()
+            elif event.number == self.horn_button and event.value:
+                return commands.Horn()
+            elif event.number == self.go_button and not event.value:
+                return commands.Go()
         elif event.event_type == RawEvent.AXIS:
             if event.number == self.steering_axis:
                 return commands.Steer(Normalize(event.value, self.steering))
@@ -116,8 +116,8 @@ class NESController(Profile):
     def __init__(self):
         Profile.__init__(self,
             steering_axis=3, left=-32767, center=0, right=32767,
-            drive_axis=4, forward=-32767, still=0, reverse=32767,
-            brake_button=2, horn_button=1, reset_button=9)
+            drive_axis=4, forward=32767, still=0, reverse=-32767,
+            stop_button=2, horn_button=1, go_button=9)
 
 
 class Listener(threading.Thread):
