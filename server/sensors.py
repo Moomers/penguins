@@ -86,7 +86,7 @@ class Sonar(ArduinoConnectedSensor):
 
 class Encoder(ArduinoConnectedSensor):
     """A magnetic encoder reading the wheel speed via a hall effect sensor"""
-    def __init__(self, robot, key, magnets = 2, window = 10):
+    def __init__(self, robot, key, magnets = 1, window = 2):
         ArduinoConnectedSensor.__init__(self, robot, key)
 
         self.magnets = magnets
@@ -110,13 +110,14 @@ class Encoder(ArduinoConnectedSensor):
             not_stale += 1
         self.readings = self.readings[not_stale:]
 
+
         # count the number of pulses in the current window; pulse count is monotonically increasing
         if len(self.readings) < 2:
             pulses = 0
             time_period = self.window
         else:
             pulses = self.readings[-1].data - self.readings[0].data
-            time_period = self.readings[-1].timestamp - now
+            time_period = now - self.readings[0].timestamp
 
         self.rpm = (pulses / self.magnets) * (60 / time_period)
         return self.rpm
@@ -136,7 +137,7 @@ class SensorReading(object):
         self.data = data
 
     def __repr__(self):
-        return "SensorReading(timestamp=%f, sensor_name=%s, data=%s" % (
+        return "SensorReading(timestamp=%f, sensor_name=%s, data=%s)" % (
                 self.timestamp,
                 self.sensor_name,
                 self.data)
