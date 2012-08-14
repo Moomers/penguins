@@ -1,8 +1,16 @@
 #!/usr/bin/python
 
 import logging
+import os
 import time
 import threading
+
+def touch(fname, times = None):
+    fhandle = file(fname, 'a')
+    try:
+        os.utime(fname, times)
+    finally:
+        fhandle.close()
 
 class ServerMonitor(threading.Thread):
     """Monitors the server and robot and takes action on exceptional conditions"""
@@ -11,6 +19,7 @@ class ServerMonitor(threading.Thread):
         self.server = server
         self.robot = robot
         self.log_estop = True
+        self.last_touched = 0
 
         # used to stop the monitor thread
         self._stop = threading.Event()
@@ -26,12 +35,17 @@ class ServerMonitor(threading.Thread):
             if self.client_age() > 5:
                 # print out this log message once per timeout
                 if self.log_estop:
-                    logging.error('server-monitor estop; client_age %.4f' % (
+                    logging.error('monitor estop; client_age %.4f' % (
                         self.client_age(),))
                 self.robot.driver.stop()
                 self.log_estop = False
             else:
                 self.log_estop = True
+
+            # touch a file every so often to tell watchdog we're still here
+            if time.time() - self.last_touched > 1:
+                touch('/tmp/server-monitor-alive')
+                self.last_touched = time.time()
 
             # send new robot speed
             self.robot.driver.update_speed()

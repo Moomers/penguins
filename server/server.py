@@ -12,8 +12,13 @@ from optparse import OptionParser, OptionGroup
 
 import arduino
 import drivers
+import logging
 import monitor
 import sensors
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s server %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M:%S')
 
 class CommandError(ValueError):
     pass
