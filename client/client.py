@@ -26,6 +26,8 @@ class Robot(object):
 
         self.server = self.sock.makefile('w')
 
+        self.disconnected = False
+
     def _send_command(self, command):
         """Sends a command to the server"""
         command = "%s\n" % (command.strip())
@@ -47,14 +49,17 @@ class Robot(object):
         self.stop()
         self._send_command('exit')
         self.sock.close()
-
-    def become_controller(self):
-        """Becomes the exclusive client driving the robot"""
-        return self._send_command('control')
+        self.disconnected = True
 
     def shutdown(self):
         """Tells the server to shut itself down."""
         self._send_command('shutdown')
+        self.sock.close()
+        self.disconnected = True
+
+    def become_controller(self):
+        """Becomes the exclusive client driving the robot"""
+        return self._send_command('control')
 
     ###### the interface of the driver #####
     def brake(self, speed):
@@ -213,7 +218,8 @@ def main():
         finally:
             player.stop()
     finally:
-        robot.disconnect()
+        if not robot.disconnected:
+            robot.disconnect()
 
 if __name__ == "__main__":
     main()
