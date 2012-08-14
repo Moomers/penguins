@@ -30,6 +30,8 @@ const byte RightEncoderPin = 2;
 const byte LeftEncoderPin = 3;
 
 // sonar
+// NOTE: Timer0 is used for millis() timing, and shares pin 5 and 6,
+// so don't mess with the frequency or nothing will happen on time.
 const byte LeftSonarPWPin = 4;
 const byte RightSonarPWPin = 5;
 
@@ -45,8 +47,8 @@ const byte RunLEDPin = 13;
 
 /*************** Constants *********************/
 
-const unsigned long MaxLoopsSinceCommand = 100000;  // TODO: 1 second.
-const unsigned long LoopsBetweenStateSend = 10000;  // TODO: 1 second.
+const unsigned long EmergencyBrakeMS = 1000;
+const unsigned long StateSendMS = 50;
 
 /*************** Globals *********************/
 
@@ -104,14 +106,14 @@ struct SerialCommand {
 static struct State {
   State() : badCommandsReceived(0),
     commandsReceived(0),
-    loopsSinceLastCommand(0),
-    loopsSinceStateSent(0),
+    lastCommandTimestamp(0),
+    lastStateSentTimestamp(0),
     emergencyStop(false),
     runLED(false) { }
   unsigned long badCommandsReceived;
   unsigned long commandsReceived;
-  unsigned long loopsSinceLastCommand;
-  unsigned long loopsSinceStateSent;
+  unsigned long lastCommandTimestamp;
+  unsigned long lastStateSentTimestamp;
   bool emergencyStop;
   bool runLED;
 } state;
@@ -122,7 +124,7 @@ const char* scan_int(const char* buf, int* value);
 SerialCommand parse_command_buffer(const char* buf, int len);
 SerialCommand read_server_command();
 void execute_command(const SerialCommand& cmd);
-void send_state();
+void send_state(unsigned long now);
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
@@ -163,17 +165,23 @@ void loop()
   //read out the sensors
   //if sensor data is strange, stop the bot
 
+  // get the current time
+  unsigned long now = millis();
+  // if time overflows, reset last command timestamp to now instead of
+  // having a ridiculous overflow. this happens every 50 days, so every
+  // 50 days, penguin will take twice as long to ebrake.
+  if (state.lastCommandTimestamp > now)
+    state.lastCommandTimestamp = now;
+
   // communicate with the server
-  send_state();
+  send_state(now);
   SerialCommand cmd = read_server_command();
 
   if (cmd.type == SerialCommand::NONE ||
       cmd.type == SerialCommand::BAD) {
     // no command was received
-    state.loopsSinceLastCommand++;
-
     // if too long since server sent something, stop
-    if (state.loopsSinceLastCommand > MaxLoopsSinceCommand) {
+    if (now - state.lastCommandTimestamp > EmergencyBrakeMS) {
       if (!state.emergencyStop)
           emergency_stop();
     }
@@ -185,7 +193,7 @@ void loop()
 
   // got a good command from the server; log and execute
   } else {
-    state.loopsSinceLastCommand = 0;
+    state.lastCommandTimestamp = now;
     state.commandsReceived++;
     execute_command(cmd);
     digitalWrite(WarnLEDPin, LOW);
@@ -207,7 +215,8 @@ void read_sensor_state() {
 void execute_command(const SerialCommand& cmd)
 {
   if (cmd.type == SerialCommand::GETSTATE) {
-    state.loopsSinceStateSent = LoopsBetweenStateSend;
+    // send state now
+    state.lastStateSentTimestamp = 0;
   }
 
   if (cmd.type == SerialCommand::GO) {
@@ -251,9 +260,10 @@ void send_velocity_to_sabertooth(int left, int right)
 }
 
 // sends the current program state to the computer
-void send_state()
+void send_state(unsigned long now)
 {
-  if (state.loopsSinceStateSent++ < LoopsBetweenStateSend) {
+  if (state.lastStateSentTimestamp != 0 &&
+      now - state.lastStateSentTimestamp < StateSendMS) {
     return;
   }
   Serial.print("C:");
@@ -265,7 +275,7 @@ void send_state()
   Serial.print(";");
 
   Serial.print("L:");
-  Serial.print(state.loopsSinceLastCommand, DEC);
+  Serial.print(now - state.lastCommandTimestamp, DEC);
   Serial.print(";");
 
   Serial.print("E:");
@@ -284,7 +294,7 @@ void send_state()
 
   Serial.print("\r\n");
 
-  state.loopsSinceStateSent = 0;
+  state.lastStateSentTimestamp = now;
   toggle_led();
 }
 
