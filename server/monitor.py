@@ -45,7 +45,7 @@ class ServerMonitor(threading.Thread):
                 self.log_estop = True
 
             # slow down if client hasn't issued control commands for a while
-            if self.control_age() > 2.5:
+            if self.control_age() > 2.5 and not self.robot.driver.braking:
                 if self.log_slowdown:
                     logging.error('braking; control_age %.4f' % (
                             self.control_age(),))
