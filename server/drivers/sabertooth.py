@@ -33,7 +33,6 @@ class SabertoothDriver(object):
 
         # controls braking mode
         self.braking_speed = 0
-        self.braking = False
 
         self.target_speeds = [0, 0] # target speed (set by calls to set_speed)
         self.last_speeds = [0, 0]   # last speed sent to motor controller (before adjust)
@@ -69,7 +68,6 @@ class SabertoothDriver(object):
 
         self.target_speeds = [0,0]
         self.braking_speed = speed
-        self.braking = True
 
     def set_speed(self, speed, motor = 'both'):
         """sets the target speed of one or both motors"""
@@ -95,7 +93,6 @@ class SabertoothDriver(object):
 
         # we're good -- update the speed
         self.braking_speed = 0
-        self.braking = False
         self.target_speeds = [new_left, new_right]
 
     def update_speed(self):
@@ -122,7 +119,7 @@ class SabertoothDriver(object):
             else:
                 # what is our maximum acceleration speed?
                 # if we're actively braking, we can go up to brake speed
-                if self.braking and abs(target_speeds[i]) < self.last_speeds[i]:
+                if self.braking_speed and abs(target_speeds[i]) < self.last_speeds[i]:
                     max_diff = self.braking_speed
 
                 # otherwise we're accelerating/decellerating normally
@@ -153,7 +150,6 @@ class SabertoothDriver(object):
                 'last left':self.last_speeds[0],
                 'last right':self.last_speeds[1],
                 'last speed update':self.last_speed_update,
-                'braking':self.braking,
                 'braking speed':self.braking_speed,
                 }
 

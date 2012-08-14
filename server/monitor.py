@@ -69,7 +69,7 @@ class ServerMonitor(threading.Thread):
 
                 # slow down if client hasn't issued control commands for a while
                 if self.control_age() > 2.5 and not (
-                        self.robot.driver.braking or self.robot.arduino.status['estop']):
+                        self.robot.driver.braking_speed or self.robot.arduino.status['estop']):
                     if self.log_slowdown:
                         logging.warn('braking; control_age %.4f' % (
                                 self.control_age(),))
