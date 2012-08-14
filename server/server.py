@@ -2,7 +2,6 @@
 
 import SocketServer
 import cPickle as pickle
-from contextlib import contextmanager
 import sys
 import time
 import threading
@@ -62,53 +61,63 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
 
         parts = command.split()
 
-        if parts[0] == 'stop':
-            robot.stop()
-            output = 'robot stopped'
+        if command not in (
+                'status', 'stop', 'brake', 'reset', 'go', 'speed', 'left', 'right'):
+            raise CommandError("invalid command '%s'" % command)
 
-        elif parts[0] == 'brake':
-            try:
-                new_speed = self.parse_speed(parts)
-                if new_speed < 1 or new_speed > 100:
-                    raise ValueError("out of range")
-            except:
-                raise CommandError("brake must be a number from 1 to 100")
 
-            robot.brake(new_speed)
-            output = 'braking initiated'
-
-        elif parts[0] == 'status':
+        if parts[0] == 'status':
             status = robot.status
             status['monitor'] = self.server.monitor.status
 
             output = status
 
-        elif parts[0] == 'reset':
-            robot.reset()
-            output = "robot reset successful"
-
-        elif parts[0] == 'go':
-            robot.go()
-            output = "robot ready to run"
-
-        elif parts[0] in ('speed', 'left', 'right'):
-            #try to get a number out of parts[1]
-            try:
-                new_speed = self.parse_speed(parts)
-                if new_speed is None or new_speed < -100 or new_speed > 100:
-                    raise ValueError("out of range")
-            except Exception, e:
-                raise CommandError("speed must be a number from -100 to 100, %s" % e)
-
-            #figure out which motor(s) we want to deal with
-            motor = parts[0] if parts[0] in ('left', 'right') else 'both'
-            robot.set_speed(new_speed, motor)
-
-            printable_motor = "%s motor" if motor in ('left', 'right') else "both motors"
-            output = "speed on %s set to %s" % (printable_motor, new_speed)
-
         else:
-            raise CommandError("invalid command '%s'" % command)
+            acquired = self.server.control_lock.acquire(blocking = 0)
+            if not acquired:
+                raise Exception("another connection is controlling the robot")
+
+            try:
+                if parts[0] == 'stop':
+                    robot.stop()
+                    output = 'robot stopped'
+
+                elif parts[0] == 'brake':
+                    try:
+                        new_speed = self.parse_speed(parts)
+                        if new_speed < 1 or new_speed > 100:
+                            raise ValueError("out of range")
+                    except:
+                        raise CommandError("brake must be a number from 1 to 100")
+
+                    robot.brake(new_speed)
+                    output = 'braking initiated'
+
+                elif parts[0] == 'reset':
+                    robot.reset()
+                    output = "robot reset successful"
+
+                elif parts[0] == 'go':
+                    robot.go()
+                    output = "robot ready to run"
+
+                elif parts[0] in ('speed', 'left', 'right'):
+                    #try to get a number out of parts[1]
+                    try:
+                        new_speed = self.parse_speed(parts)
+                        if new_speed is None or new_speed < -100 or new_speed > 100:
+                            raise ValueError("out of range")
+                    except Exception, e:
+                        raise CommandError("speed must be a number from -100 to 100, %s" % e)
+
+                    #figure out which motor(s) we want to deal with
+                    motor = parts[0] if parts[0] in ('left', 'right') else 'both'
+                    robot.set_speed(new_speed, motor)
+
+                    printable_motor = "%s motor" if motor in ('left', 'right') else "both motors"
+                    output = "speed on %s set to %s" % (printable_motor, new_speed)
+            finally:
+                self.server.control_lock.release()
 
         return output
 
@@ -141,7 +150,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
                     if self.controller:
                         self.send_output('ok', 'was already a controller')
                     else:
-                        self.controller = self.server.robot.control_lock.acquire(blocking = 0)
+                        self.controller = self.server.control_lock.acquire(blocking = 0)
                         if self.controller:
                             self.send_output('ok', 'acquired control lock')
                         else:
@@ -163,7 +172,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
         finally:
             output = ["%s:%s disconnected" % self.client_address]
             if self.controller:
-                self.server.robot.control_lock.release()
+                self.server.control_lock.release()
                 self.server.robot.stop()
                 output.append("; robot stopped. no more controlling client")
             else:
@@ -193,8 +202,6 @@ class Robot(object):
                 'Right encoder':sensors.Encoder(self, 'RE'),
                 }
 
-        # used to limit control of the robot to a single controlling thread
-        self.control_lock = threading.RLock()
         # keep track of when the last command was issued to the robot
         self.last_control = 0
 
@@ -220,48 +227,34 @@ class Robot(object):
 
     def reset(self):
         """Reset all of the components to a known initialized state"""
-        with self._lock():
-            if self.arduino:
-                self.arduino.stop()
+        if self.arduino:
+            self.arduino.stop()
 
-            self.arduino = arduino.find_arduino(self.arduino_serial)
-            self.arduino.start_monitor()
+        self.arduino = arduino.find_arduino(self.arduino_serial)
+        self.arduino.start_monitor()
 
-            self.driver.stop()
+        self.driver.stop()
+        self.last_control = time.time()
 
     def go(self):
         """Puts the robot in go mode"""
-        with self._lock():
-            self.driver.go()
+        self.driver.go()
+        self.last_control = time.time()
 
     def stop(self):
         """Stops the robot"""
-        with self._lock():
-            self.driver.stop()
+        self.driver.stop()
+        self.last_control = time.time()
 
     def brake(self, speed):
         """initiates braking"""
-        with self._lock():
-            self.driver.brake(speed)
+        self.driver.brake(speed)
+        self.last_control = time.time()
 
     def set_speed(self, speed, motor):
         """sets the speed on one or both motors"""
-        with self._lock():
-            self.driver.set_speed(speed, motor)
-
-    @contextmanager
-    def _lock(self):
-        """Utility function to protect control operations"""
-        locked = self.control_lock.acquire(blocking = 0)
-        if locked:
-            try:
-                yield
-            finally:
-                self.last_control = time.time()
-                self.control_lock.release()
-        else:
-            raise Exception("Another thread is currently controlling the robot")
-
+        self.driver.set_speed(speed, motor)
+        self.last_control = time.time()
 
 def main():
     """Parses command-line options and starts the robot-controlling server"""
@@ -327,6 +320,9 @@ def main():
     server = TCPServer((options.host, options.port), ConnectionHandler)
     server.last_request = 0
     server.robot = robot
+
+    # used to limit control of the robot to a single connection
+    server.control_lock = threading.RLock()
 
     # create the monitor
     server_monitor = monitor.ServerMonitor(server, robot)
