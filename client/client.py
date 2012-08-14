@@ -109,6 +109,8 @@ class RobotClient(object):
                     elif type(user_command) == commands.Shutdown:
                         self.robot.shutdown()
                         break
+                    elif type(user_command) == commands.Horn and self.sound:
+                        self.sound.play_honk()
                     elif type(user_command) == commands.Reset:
                         self.robot.reset()
                     elif type(user_command) == commands.Go:

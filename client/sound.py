@@ -5,6 +5,7 @@ import os
 import pyaudio
 import Queue
 import threading
+import time
 import wave
 
 SOUND_DIR = '../sounds/joyride'
@@ -65,6 +66,9 @@ class SoundPlayer(object):
     def start(self):
         self.mixer.start()
 
+    def play_honk(self):
+        self.mixer.queue(SOUNDS['honk'])
+
     def stop(self):
         self.mixer.stop()
         self.mixer.join()
@@ -77,4 +81,5 @@ if __name__ == "__main__":
     mixer = Mixer()
     mixer.start()
     mixer.queue(SOUNDS['tada'])
+    time.sleep(2)
     mixer.stop()
