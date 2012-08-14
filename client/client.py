@@ -1,11 +1,23 @@
-import socket
+#!/usr/bin/env python
+
 import cPickle as pickle
+import socket
+import threading
 
 from optparse import OptionParser, OptionGroup
-import ui
 
-HOST, PORT = "localhost", 9999
-class DriverClient(object):
+import cursesui
+import joyride
+import framebuffer
+import sound
+import steering
+
+class RobotCommandError(Exception):
+    """Used when a robot command cannot be executed"""
+    pass
+
+class Robot(object):
+    """Wraps the communication protocol with the robot server"""
     def __init__(self, host, port):
         """connects to the driver server"""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -27,7 +39,7 @@ class DriverClient(object):
         if result[0] == 'ok':
             return result[1]
         else:
-            raise Exception(str(result))
+            raise RobotCommandError(str(result))
 
     def disconnect(self):
         """Stops the motors and disconnects from the server"""
@@ -35,19 +47,32 @@ class DriverClient(object):
         self._send_command('exit')
         self.sock.close()
 
+    def shutdown(self):
+        """Shuts down the robot, which also disconnects this client"""
+        self._send_command('shutdown')
+        self.sock.close()
+        return True
+
+    def become_controller(self):
+        """Becomes the exclusive client driving the robot"""
+        return self._send_command('control')
+
     ###### the interface of the driver #####
     def brake(self, speed):
+        """Gradually slows the robot at the specified speed"""
         return self._send_command("brake %s" % speed)
 
     def stop(self):
+        """Stops the robot and prevents it from moving again"""
         return self._send_command("stop")
 
-    def reset(self):
-        return self._send_command('reset')
+    def go(self):
+        """Gets the robot ready to move"""
+        return self._send_command('go')
 
-    @property
-    def status(self):
-        return self._send_command('status')
+    def reset(self):
+        """Resets the robot into a known state"""
+        return self._send_command('reset')
 
     def set_speed(self, speed, motor = 'both'):
         """sets the speed of one or both motors"""
@@ -60,39 +85,73 @@ class DriverClient(object):
 
         return ", ".join(outputs)
 
-    def get_speed(self, motor = 'both'):
-        """Returns the current speed of a motor"""
-        if motor == 'both':
-            speeds = self._send_command('speed')
-            return [int(s.strip()) for s in speeds.split(',')]
-        else:
-            speed = self._send_command(motor)
-            return [int(speed.strip())]
+    def get_status(self):
+        return self._send_command('status')
 
-    speed = property(
-            lambda self: self.get_speed('both'),
-            lambda self, speed: self.set_speed(speed, 'both'))
+class RobotClient(object):
+    """Controls the robot"""
+    def __init__(self, robot, ui, steering_model, sound):
+        self.robot = robot
+        self.ui = ui
+        self.steering = steering_model
+        self.sound = sound
 
-    left = property(
-            lambda self: self.get_speed('left')[0],
-            lambda self, speed: self.set_speed(speed, 'left'))
-    right = property(
-            lambda self: self.get_speed('right')[0],
-            lambda self, speed: self.set_speed(speed, 'right'))
+        self._stop = threading.Event()
+
+    def run(self):
+        """Main loop which drives the robot"""
+        while not self._stop.is_set():
+            user_command = self.ui.get_command()
+            if user_command:
+                try:
+                    if user_command[0] == 'quit':
+                        self.robot.disconnect()
+                        break
+                    elif user_command[0] == 'shutdown':
+                        self.robot.shutdown()
+                        break
+                    elif user_command[0] == 'reset':
+                        self.robot.reset()
+
+                    elif user_command[0] == 'go':
+                        self.robot.go()
+                    elif user_command[0] == 'stop':
+                        self.robot.stop()
+
+                    elif user_command[0] in ('brake', 'hold', 'forward', 'back', 'left', 'right'):
+                        speed_args = self.steering.parse_user_command(user_command)
+                        self.robot.set_speed(**speed_args)
+
+                except RobotCommandError, e:
+                    self.ui.error_notify(e)
+
+            status = self.robot.get_status()
+            self.ui.update_status(status)
+            self.steering.update_status(status)
+
+            if self.sound:
+                self.sound.update_status(status)
 
 def main():
     """If run directly, we will connect to a server and run the specified UI"""
     uilist = {
-            'curses':("NCurses-based UI using arrow keys for steering", ui.CursesUI),
+            'joyride':("Uses a joystick for steering and outputs console text", joyride),
+            'curses':("A simple curses-based output UI with very basic arrow-key steering", cursesui),
+            'framebuffer':("An output intenteded for the on-board computer, with no steering", framebuffer),
             }
 
     parser = OptionParser()
-    parser.add_option('-i', '--ui', action="store", type="choice", dest="ui", default="curses", choices=uilist.keys(),
-            help="Start up this UI [Default: curses]")
-    parser.add_option('-v', "--verbose", action="store_true", dest="verbose", default=False,
-            help="Print more debug info")
-    parser.add_option("--list", action="store_true", dest="list", default=False,
-            help="List the available UIs")
+
+    uigroup = OptionGroup(parser, "UI options")
+    uigroup.add_option('-u', '--ui', action="store", type="choice", dest="ui", default="curses", choices=uilist.keys(),
+            help="Interact with this type of UI [Default: joyride]")
+    uigroup.add_option('-j', '--joystick', action="store", type="string", dest="joystick", default=None,
+            help="Path to the device file of the joystick (for joyride UI) [Default: None]")
+    uigroup.add_option('-s', '--disable-sound', action="store_false", dest="sound", default=True,
+            help="Disable sound [Default: False]")
+    uigroup.add_option("--list", action="store_true", dest="list", default=False,
+            help="List the available UIs and exit")
+    parser.add_option_group(uigroup)
 
     netgroup = OptionGroup(parser, "Network options")
     netgroup.add_option('-a', '--host', action="store", type="string", dest="host", default="localhost",
@@ -101,28 +160,51 @@ def main():
             help="Port the server is listening on [Default: 9999]")
     parser.add_option_group(netgroup)
 
-
     options, args = parser.parse_args()
+
+    list_and_exit = False
     if options.list:
+        list_and_exit = True
+
+    if not options.ui or options.ui not in uilist:
+        print "You must pick one of the available UIs with --ui"
+
+    if list_and_exit:
         print "Available UIs:"
         for name, info in uilist.items():
             print "%s %s" % (name.ljust(30), info[0])
-
         return 0
 
-    client = DriverClient(options.host, options.port)
+    # create the robot
+    robot = Robot(options.host, options.port)
+    status = robot.get_status()
+
+    # create the ui
+    uimod = uilist[options.ui][1]
+    ui = uimod.get_ui(**vars(options))
+
+    # create the steerer
+    steerer = steering.SteeringModel(status)
+
+    if options.sound:
+        player = sound.SoundPlayer(status)
+    else:
+        player = None
+
+    # create the robot client
+    client = RobotClient(robot, ui, steerer, player)
+
+    # start up all the pieces in the right order
+    player.start()
     try:
+        ui.init()
+        ui.start()
         try:
-            interface = uilist[options.ui][1](client)
-        except:
-            parser.error("Cannot create UI '%s'" % options.ui)
-        else:
-            try:
-                interface.run()
-            finally:
-                interface.cleanup()
+            client.run()
+        finally:
+            ui.stop()
     finally:
-        client.disconnect()
+        player.stop()
 
 if __name__ == "__main__":
     main()
