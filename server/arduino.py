@@ -90,7 +90,7 @@ class Arduino(object):
     IO_TIMEOUT_SEC = 5
 
     # how stale does the state get until we are considered no longer healthy?
-    HEALTH_TIMEOUT = 5
+    HEALTH_TIMEOUT = 2
 
     def __init__(self, port, baud_rate=9600):
         """Connects to the Arduino on a serial port.
@@ -162,6 +162,7 @@ class Arduino(object):
                 'estop':(not self.state or self.state.emergency_stop),
                 'sent':self.commands_sent,
                 'recieved':self.state.commands_received if self.state else 0,
+                'bad':self.state.bad_commands_received if self.state else 0,
                 }
         return status
 
