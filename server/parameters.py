@@ -15,9 +15,9 @@ driver = {
 monitor = {
         'time_between_reset_attempts':.5,
         'client_timeout':5,
-        'control_timeout_brake':2.5,
-        'control_timeout_stop':5,
-        'timeout_brake_speed':3,
+        'control_timeout_brake':2,
+        'control_timeout_stop':6,
+        'timeout_brake_speed':2,
 
         'file_touch_path':'/tmp/server-monitor-alive',
         'file_touch_interval':1,
