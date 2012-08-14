@@ -7,7 +7,7 @@ import time
 class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
     def __init__(self, robot,
-            min_speed = 0, max_speed = 100, max_braking = 100, max_acceleration = 1, max_turn_speed = 200,
+            min_speed = 0, max_speed = 100, max_turn_speed = 200, max_acceleration = 1, max_braking = 10,
             speed_adjust = 1, left_speed_adjust = 1, right_speed_adjust = 1,
             min_update_interval = 0.1):
         self.robot = robot
@@ -20,6 +20,7 @@ class SabertoothDriver(object):
         # these parameters control the functioning of the driver (checked in update_speed)
         self.min_speed = self.validate_parameter('Minimum speed', min_speed, 0, 99)
         self.max_acceleration = self.validate_parameter('Maximum acceleration', max_acceleration, 1, 200)
+        self.max_braking = self.validate_parameter('Maximum braking speed', max_braking, 1, 200)
         self.speed_adjust = self.validate_parameter('Overall speed adjustment', speed_adjust, 0, 1)
 
         self.side_adjust = (
@@ -29,6 +30,10 @@ class SabertoothDriver(object):
         # controls maximum frequency with which update_speed runs
         self.last_speed_update = 0  # last time speed was updated
         self.min_update_interval = min_update_interval
+
+        # controls braking mode
+        self.braking_speed = 0
+        self.braking = False
 
         self.target_speeds = [0, 0] # target speed (set by calls to set_speed)
         self.last_speeds = [0, 0]   # last speed sent to motor controller (before adjust)
@@ -47,7 +52,7 @@ class SabertoothDriver(object):
     ###### the interface of the driver #####
     def go(self):
         """Puts the controller into a basic run state"""
-        self.target_speeds = [0, 0]
+        self.brake(self.max_braking)
         self.robot.arduino.send_command('G')
 
     def stop(self):
@@ -57,7 +62,14 @@ class SabertoothDriver(object):
 
     def brake(self, speed):
         """Applies braking to the motors"""
-        self.target_speed = [0, 0]
+        if speed < 1:
+            raise common.ParameterError("Braking speed %d below minimum value of 1" % speed)
+        elif speed > self.max_braking:
+            raise common.ParameterError("Braking speed %d exceeds maximum value of %d" % (speed, self.max_braking))
+
+        self.target_speed = [0,0]
+        self.braking_speed = speed
+        self.braking = True
 
     def set_speed(self, speed, motor = 'both'):
         """sets the target speed of one or both motors"""
@@ -79,6 +91,8 @@ class SabertoothDriver(object):
             raise common.ParameterError("New targets (%d,%d) exceed maximum turn velocity of %d" % (new_left, new_right, self.max_turn_speed))
 
         # we're good -- update the speed
+        self.braking_speed = 0
+        self.braking = False
         self.target_speeds = [new_left, new_right]
 
     def update_speed(self):
@@ -103,9 +117,18 @@ class SabertoothDriver(object):
                 to_send[i] = 0
 
             else:
+                # what is our maximum acceleration speed?
+                # if we're actively braking, we can go up to brake speed
+                if self.braking and abs(target_speeds[i]) < self.last_speed[i]:
+                    max_diff = self.brake_speed
+
+                # otherwise we're accelerating/decellerating normally
+                else:
+                    max_diff = self.max_acceleration
+
                 # avoid accelerating more than the max acceleration
                 diff = target_speeds[i] - self.last_speeds[i]
-                if abs(diff) > self.max_acceleration:
+                if abs(diff) > max_diff:
                     diff = copysign(self.max_acceleration, diff)
                 self.last_speeds[i] = self.last_speeds[i] + diff
 
