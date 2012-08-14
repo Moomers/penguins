@@ -4,7 +4,6 @@ import logging
 import os
 import time
 import threading
-from math import copysign
 
 def touch(fname, times = None):
     fhandle = file(fname, 'a')
@@ -45,16 +44,13 @@ class ServerMonitor(threading.Thread):
             else:
                 self.log_estop = True
 
-            # slow down to emergency speed if client hasn't issued control commands
-            # for a while and is trying to go faster than this.
-            # the driver is responsible for decelerating smoothly.
-            if (self.control_age() > 2.5 and
-                (abs(self.robot.driver.status['target left']) > 10 or
-                 abs(self.robot.driver.status['target right']) > 10)):
+            # slow down if client hasn't issued control commands for a while
+            if self.control_age() > 2.5:
                 if self.log_slowdown:
-                    logging.error('controlled slowdown; control_age %.4f' % (
+                    logging.error('braking; control_age %.4f' % (
                             self.control_age(),))
-                self.robot.driver.set_speed(10)
+
+                self.robot.driver.brake(3)
                 self.log_slowdown = False
             # emergency brake if still no control.
             elif self.control_age() > 5:
@@ -66,7 +62,6 @@ class ServerMonitor(threading.Thread):
             else:
                 self.log_slowdown = True
                 self.log_control_estop = True
-
 
             # touch a file every so often to tell watchdog we're still here
             if time.time() - self.last_touched > 1:
