@@ -7,7 +7,7 @@ import time
 class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
     def __init__(self, robot,
-            min_speed = 0, max_speed = 100, max_braking = 100, max_acceleration = 200, max_turn_speed = 200,
+            min_speed = 0, max_speed = 100, max_braking = 100, max_acceleration = 1, max_turn_speed = 200,
             speed_adjust = 1, left_speed_adjust = 1, right_speed_adjust = 1,
             min_update_interval = 0.1):
         self.robot = robot
@@ -112,10 +112,10 @@ class SabertoothDriver(object):
                 # send adjusted parameters
                 to_send[i] = self.last_speeds[i] * self.side_adjust[i] * self.speed_adjust
 
-            # sabertooth takes right,left instead of left-right like everything else here
-            self.robot.arduino.send_command('V%d,%d' % (
-                self._convert_speed(to_send[1]),
-                self._convert_speed(to_send[0])))
+        # sabertooth takes right,left instead of left-right like everything else here
+        self.robot.arduino.send_command('V%d,%d' % (
+            self._convert_speed(to_send[1]),
+            self._convert_speed(to_send[0])))
 
         self.last_speed_update = time.time()
 
