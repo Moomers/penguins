@@ -75,7 +75,7 @@ class SabertoothDriver(object):
         if abs(speed) > self.max_speed:
             raise common.ParameterError("Speed %d exceeds maximum value of %d" % (speed, copysign(self.max_speed, speed)))
 
-        if abs(abs(new_left) - abs(new_right)) > self.max_turn_speed:
+        if abs(new_left - new_right) > self.max_turn_speed:
             raise common.ParameterError("New targets (%d,%d) exceed maximum turn velocity of %d" % (new_left, new_right, self.max_turn_speed))
 
         # we're good -- update the speed
@@ -103,7 +103,7 @@ class SabertoothDriver(object):
 
             else:
                 # avoid accelerating more than the max acceleration
-                diff = abs(self.target_speeds[i]) - abs(self.last_speeds[i])
+                diff = self.target_speeds[i] - self.last_speeds[i]
                 if abs(diff) > self.max_acceleration:
                     diff = copysign(self.max_acceleration, diff)
                 self.last_speeds[i] = self.last_speeds[i] + diff
