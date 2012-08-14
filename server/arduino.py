@@ -18,25 +18,25 @@ class State(object):
             commands_sent = 0,
             commands_received = 0,
             bad_commands_received = 0,
-            loops_since_command_received = 0,
+            ms_since_command_received = 0,
             emergency_stop = False,
             ):
         self.timestamp = timestamp
         self.commands_sent = commands_sent
         self.commands_received = commands_received
         self.bad_commands_received = bad_commands_received
-        self.loops_since_command_received = loops_since_command_received
+        self.ms_since_command_received = ms_since_command_received
         self.emergency_stop = emergency_stop
 
     def __repr__(self):
         return "State(timestamp=%f, commands_sent=%d, commands_received=%d, "\
-                "bad_commands_received=%d, loops_since_command_received=%d, "\
+                "bad_commands_received=%d, ms_since_command_received=%d, "\
                 "emergency_stop=%d)" % (
                        self.timestamp,
                        self.commands_sent,
                        self.commands_received,
                        self.bad_commands_received,
-                       self.loops_since_command_received,
+                       self.ms_since_command_received,
                        self.emergency_stop)
 
 class ArduinoMonitor(threading.Thread):
@@ -133,7 +133,7 @@ class Arduino(object):
         # Not healthy until we've received a valid state.
         if not self.state:
             return False
-        return (self.state.timestamp < time.time() - self.HEALTH_TIMEOUT)
+        return (time.time() - self.state.timestamp < self.HEALTH_TIMEOUT)
 
     def start_monitor(self):
         """Starts the monitor thread that handles communication with the arduino"""
@@ -157,8 +157,12 @@ class Arduino(object):
     @property
     def status(self):
         """Returns a dictionary of the arduino's status for the client"""
-        status = {'healthy':self.is_healthy(),
-              'estop':(not self.state or self.state.emergency_stop)}
+        status = {
+                'healthy':self.is_healthy(),
+                'estop':(not self.state or self.state.emergency_stop),
+                'sent':self.commands_sent,
+                'recieved':self.state.commands_received if self.state else 0,
+                }
         return status
 
     def send_command(self, command):
@@ -236,7 +240,7 @@ class Arduino(object):
                     commands_sent = self.commands_sent,
                     commands_received = int(state['C']),
                     bad_commands_received = int(state['B']),
-                    loops_since_command_received = int(state['L']),
+                    ms_since_command_received = int(state['L']),
                     emergency_stop = bool(int(state['E'])),)
             self.state = new_state
 
