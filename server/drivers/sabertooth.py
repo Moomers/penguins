@@ -7,7 +7,7 @@ import time
 class SabertoothDriver(object):
     """A driver which controls motors via the Sabertooth 2x60 Motor Controller"""
     def __init__(self, robot,
-            min_speed = 0, max_speed = 100, max_turn_speed = 200, max_acceleration = 1, max_braking = 10,
+            min_speed = 0, max_speed = 100, max_turn_speed = 200, max_acceleration = 100, max_braking = 100,
             speed_adjust = 1, left_speed_adjust = 1, right_speed_adjust = 1,
             min_update_interval = 0.1):
         self.robot = robot
@@ -72,7 +72,7 @@ class SabertoothDriver(object):
     def set_speed(self, speed, motor = 'both'):
         """sets the target speed of one or both motors"""
         if self.robot.arduino.status['estop']:
-            raise common.DriverError("Cannot change speed while emergency stopped")
+            raise common.StoppedError("Cannot change speed while emergency stopped")
 
         old_left, old_right = self.target_speeds
 
