@@ -35,12 +35,23 @@ class DriverClient(object):
         self._send_command('exit')
         self.sock.close()
 
+    def control(self):
+        """Tells the server we want to move the penguin."""
+        return self._send_command('control')
+
+    def shutdown(self):
+        """Tells the server to shut itself down."""
+        self._send_command('shutdown')
+
     ###### the interface of the driver #####
     def brake(self, speed):
         return self._send_command("brake %s" % speed)
 
     def stop(self):
         return self._send_command("stop")
+
+    def go(self):
+        return self._send_command('go')
 
     def reset(self):
         return self._send_command('reset')
