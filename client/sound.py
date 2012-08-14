@@ -7,7 +7,7 @@ import Queue
 import threading
 import wave
 
-SOUND_DIR = '../../sounds/joyride'
+SOUND_DIR = '../sounds/joyride'
 
 class Sound(object):
     def __init__(self, name):
@@ -56,6 +56,22 @@ class Mixer(threading.Thread):
             stream.write(data)
             data = sound.wf.readframes(Mixer.CHUNKSIZE)
         stream.close()
+
+class SoundPlayer(object):
+    def __init__(self, status):
+        self.last_status = status
+        self.mixer = Mixer()
+
+    def start(self):
+        self.mixer.start()
+
+    def stop(self):
+        self.mixer.stop()
+        self.mixer.join()
+
+    def update_status(self, new_status):
+        """Go through the new status and play sounds for any new alerts"""
+        self.last_status = new_status
 
 if __name__ == "__main__":
     mixer = Mixer()
