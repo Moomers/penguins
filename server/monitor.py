@@ -24,6 +24,9 @@ class ServerMonitor(threading.Thread):
             if self.client_age() > 5:
                 self.robot.driver.stop()
 
+            # send new robot speed
+            self.robot.driver.update_speed()
+
             time.sleep(.05)
 
     def stop(self):
