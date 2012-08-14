@@ -32,11 +32,13 @@ class CursesUI(threading.Thread):
         curses.halfdelay(1)
 
         #initialize the status and result windows
-        self.windows['driver'] = self.create_window(' Driver Status ', 10, 40, 0, 0)
-        self.windows['monitor'] = self.create_window(' Monitor Status ', 10, 40, 0, 41)
-        self.windows['arduino'] = self.create_window(' Arduino Status ', 10, 40, 11, 0)
-        self.windows['sensors'] = self.create_window(' Sensor Status ', 10, 40, 11, 41)
-        self.windows['result'] = self.create_window(' Last Result ', 3, 84, 22, 0)
+        self.windows['time'] = self.create_window(' Time ', 3, 82, 0, 0)
+
+        self.windows['driver'] = self.create_window(' Driver Status ', 10, 40, 3, 0)
+        self.windows['monitor'] = self.create_window(' Monitor Status ', 10, 40, 3, 41)
+        self.windows['arduino'] = self.create_window(' Arduino Status ', 10, 40, 14, 0)
+        self.windows['sensors'] = self.create_window(' Sensor Status ', 10, 40, 14, 41)
+        self.windows['result'] = self.create_window(' Last Result ', 3, 82, 25, 0)
 
     def cleanup(self):
         """Clean up ncurses"""
@@ -49,6 +51,7 @@ class CursesUI(threading.Thread):
     def run(self):
         """The main loop"""
         while not self._stop.is_set():
+            self.write_line(self.windows['time'], 1, "%.2f" % time.time(), align = 'center')
             for window in self.windows.values():
                 window.refresh()
 
@@ -121,6 +124,7 @@ class CursesUI(threading.Thread):
             linenum = 1
             for key, val in s.items():
                 self.write_key_value(window, linenum, key, val)
+                linenum += 1
 
         sen_line = 1
         for sen in status['sensors']:
@@ -143,19 +147,19 @@ class CursesUI(threading.Thread):
                 return ('stop', None)
             elif self._last_key == 't':
                 return ('shutdown', None)
-            elif self._last_key == 'h':
-                return ('hold', None)
+
             elif self._last_key == 'b':
                 return ('brake', 100)
-
+            elif self._last_key == 'h':
+                return ('hold', None)
             elif self._last_key == 'KEY_UP':
-                return ('forward', 1)
+                return ('forward', (0, 1, 0))
             elif self._last_key == 'KEY_LEFT':
                 return ('left', 1)
             elif self._last_key == 'KEY_RIGHT':
                 return ('right', 1)
             elif self._last_key == 'KEY_DOWN':
-                return ('back', 1)
+                return ('back', (0, 1, 0))
 
             else:
                 return None
@@ -163,6 +167,10 @@ class CursesUI(threading.Thread):
         finally:
             self._last_key = None
         self.cleanup()
+
+    def error_notify(self, error):
+        """Displays the error in the results window"""
+        self.write_result("Error at %.2f: %s" % (time.time(), str(error)))
 
 def get_ui(**options):
     return CursesUI()
