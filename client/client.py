@@ -184,32 +184,36 @@ def main():
     robot = Robot(options.host, options.port)
     status = robot.get_status()
 
-    # create the ui
-    uimod = uilist[options.ui][1]
-    ui = uimod.get_ui(**vars(options))
-
-    # create the steerer
-    steerer = steering.SteeringModel(status)
-
-    if options.sound:
-        player = sound.SoundPlayer(status)
-    else:
-        player = None
-
-    # create the robot client
-    client = RobotClient(robot, ui, steerer, player)
-
-    # start up all the pieces in the right order
-    player.start()
+    # handle gracefully disconnecting the robot if anything else fails
     try:
-        ui.init()
-        ui.start()
+        # create the ui
+        uimod = uilist[options.ui][1]
+        ui = uimod.get_ui(**vars(options))
+
+        # create the steerer
+        steerer = steering.SteeringModel(status)
+
+        if options.sound:
+            player = sound.SoundPlayer(status)
+        else:
+            player = None
+
+        # create the robot client
+        client = RobotClient(robot, ui, steerer, player)
+
+        # start up all the pieces in the right order
+        player.start()
         try:
-            client.run()
+            ui.init()
+            ui.start()
+            try:
+                client.run()
+            finally:
+                ui.stop()
         finally:
-            ui.stop()
+            player.stop()
     finally:
-        player.stop()
+        robot.disconnect()
 
 if __name__ == "__main__":
     main()
