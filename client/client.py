@@ -115,12 +115,17 @@ class RobotClient(object):
                         self.robot.go()
                     elif user_command[0] == 'stop':
                         self.robot.stop()
+                    elif user_command[0] == 'brake':
+                        self.robot.brake(user_command[1])
 
-                    elif user_command[0] in ('brake', 'hold', 'forward', 'back', 'left', 'right'):
-                        speed_args = self.steering.parse_user_command(user_command)
-                        self.robot.set_speed(**speed_args)
+                    elif user_command[0] in (
+                            'hold', 'forward', 'back', 'left', 'right'):
+                        new_speeds = self.steering.parse_user_command(user_command)
+                        self.robot.set_speed(int(new_speeds['left']), 'left')
+                        self.robot.set_speed(int(new_speeds['right']), 'right')
 
                 except RobotCommandError, e:
+                    open('log', 'w+').write(str(e))
                     self.ui.error_notify(e)
 
             status = self.robot.get_status()
