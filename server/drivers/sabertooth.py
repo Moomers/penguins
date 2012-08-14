@@ -62,8 +62,8 @@ class SabertoothDriver(object):
 
     def brake(self, speed):
         """Applies braking to the motors"""
-        if speed < 1:
-            raise common.ParameterError("Braking speed %d below minimum value of 1" % speed)
+        if speed < 0:
+            raise common.ParameterError("Braking speed %d cannot be negative" % speed)
         elif speed > self.max_braking:
             raise common.ParameterError("Braking speed %d exceeds maximum value of %d" % (speed, self.max_braking))
 
