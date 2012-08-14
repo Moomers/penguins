@@ -73,6 +73,9 @@ class SabertoothDriver(object):
 
     def set_speed(self, speed, motor = 'both'):
         """sets the target speed of one or both motors"""
+        if self.arduino.status['estop']:
+            raise common.DriverError("Cannot change speed while emergency stopped")
+
         old_left, old_right = self.target_speeds
 
         # figure out what new targets will be

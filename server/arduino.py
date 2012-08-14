@@ -43,7 +43,7 @@ class ArduinoMonitor(threading.Thread):
     """Monitors an Arduino state and sends regular heartbeat commands"""
 
     # Seconds between sending heartbeats.
-    # The arduino ebrake timeout is 1 second, so with 0.1s between heartbeats
+    # The arduino estop timeout is 1 second, so with 0.1s between heartbeats
     # we get 10 attempts to keep it alive.
     HEARTBEAT_SECS = 0.1
 
