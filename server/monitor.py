@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import logging
 import time
 import threading
 
@@ -9,6 +10,7 @@ class ServerMonitor(threading.Thread):
         threading.Thread.__init__(self)
         self.server = server
         self.robot = robot
+        self.log_estop = True
 
         # used to stop the monitor thread
         self._stop = threading.Event()
@@ -22,7 +24,14 @@ class ServerMonitor(threading.Thread):
 
             # brake if the client hasn't said anything for a while
             if self.client_age() > 5:
+                # print out this log message once per timeout
+                if self.log_estop:
+                    logging.error('server-monitor estop; client_age %.4f' % (
+                        self.client_age(),))
                 self.robot.driver.stop()
+                self.log_estop = False
+            else:
+                self.log_estop = True
 
             # send new robot speed
             self.robot.driver.update_speed()
