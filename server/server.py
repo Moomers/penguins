@@ -30,8 +30,9 @@ class TCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         self.is_shutting_down = threading.Event()
 
     def shutdown(self):
-        self.is_shutting_down.set()
-        SocketServer.TCPServer.shutdown(self)
+        if not self.is_shutting_down.is_set():
+            self.is_shutting_down.set()
+            SocketServer.TCPServer.shutdown(self)
 
 class ConnectionHandler(SocketServer.StreamRequestHandler):
     def parse_speed(self, parts):
@@ -332,6 +333,7 @@ def main():
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        server.is_shutting_down.set()
         return 0
     finally:
         print "Shutting down..."
