@@ -4,7 +4,7 @@ class DriverError(Exception):
    """Used when the driver encounters an error executing the command"""
    pass
 
-class StoppedError(DriverErrror):
+class StoppedError(DriverError):
     """Signals that a command was invalid because we're in emergency stop mode"""
     pass
 
