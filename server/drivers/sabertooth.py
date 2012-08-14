@@ -42,18 +42,18 @@ class SabertoothDriver(object):
         if speed > 100 or speed < -100:
             raise common.DriverError("Speed outside the allowed range")
 
-        return speed * 63 / 100
+        return int(speed * 63 / 100)
 
     ###### the interface of the driver #####
     def go(self):
         """Puts the controller into a basic run state"""
+        self.target_speeds = [0, 0]
         self.robot.arduino.send_command('G')
 
     def stop(self):
         """Stops the robot"""
         self.robot.arduino.send_command('X')
         self.target_speeds = [0, 0]
-        self.last_speeds = [0, 0]
 
     def brake(self, speed):
         """Applies braking to the motors"""
@@ -80,7 +80,6 @@ class SabertoothDriver(object):
 
         # we're good -- update the speed
         self.target_speeds = [new_left, new_right]
-        self.update_speed()
 
     def update_speed(self):
         """Updates the current speed to match target speed (in accordance with parameters)"""
@@ -92,18 +91,20 @@ class SabertoothDriver(object):
         if self.target_speeds == self.last_speeds:
             return True
 
+        # make a copy of the target spees to avoid race conditions
+        target_speeds = list(self.target_speeds)
         # figure out what we're going to send this time around
         to_send = list(self.last_speeds)
 
         for i in (0, 1):
             # if our speed is too slow, send 0 but claim target has been reached
-            if abs(self.target_speeds[i]) < self.min_speed:
-                self.last_speeds[i] = copysign(self.min_speed, self.target_speeds[i])
+            if abs(target_speeds[i]) < self.min_speed:
+                self.last_speeds[i] = copysign(self.min_speed, target_speeds[i])
                 to_send[i] = 0
 
             else:
                 # avoid accelerating more than the max acceleration
-                diff = self.target_speeds[i] - self.last_speeds[i]
+                diff = target_speeds[i] - self.last_speeds[i]
                 if abs(diff) > self.max_acceleration:
                     diff = copysign(self.max_acceleration, diff)
                 self.last_speeds[i] = self.last_speeds[i] + diff
@@ -112,7 +113,9 @@ class SabertoothDriver(object):
                 to_send[i] = self.last_speeds[i] * self.side_adjust[i] * self.speed_adjust
 
             # sabertooth takes right,left instead of left-right like everything else here
-            self.robot.arduino.send_command('V%d,%d' % (to_send[1], to_send[0]))
+            self.robot.arduino.send_command('V%d,%d' % (
+                self._convert_speed(to_send[1]),
+                self._convert_speed(to_send[0])))
 
         self.last_speed_update = time.time()
 
