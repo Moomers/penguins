@@ -165,7 +165,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
                 except CommandError, e:
                     self.send_output('invalid', e.message)
                 # driver rejected the command, but not due to an error
-                except (driver.common.ParameterError, driver.common.StoppedError), e:
+                except (drivers.common.ParameterError, drivers.common.StoppedError), e:
                     self.send_output('rejected', e.message)
                 # unknown error -- send error to the client, and log the exception
                 except Exception, e:
@@ -213,7 +213,11 @@ class Robot(object):
 
     def shutdown(self):
         """Stop talking to the arduino or moving"""
-        self.driver.stop()
+        try:
+            self.driver.stop()
+        except:
+            logging.exception("Could not stop driver on shutdown")
+
         self.arduino.stop()
 
     @property
@@ -235,6 +239,8 @@ class Robot(object):
         """Reset all of the components to a known initialized state"""
         if self.arduino:
             self.arduino.stop()
+
+        time.sleep(.5)
 
         self.arduino = arduino.find_arduino(self.arduino_serial)
         self.arduino.start_monitor()
