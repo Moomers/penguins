@@ -61,7 +61,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
 
         parts = command.split()
 
-        if command not in (
+        if parts[0] not in (
                 'status', 'stop', 'brake', 'reset', 'go', 'speed', 'left', 'right'):
             raise CommandError("invalid command '%s'" % command)
 
