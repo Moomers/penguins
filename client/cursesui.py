@@ -147,7 +147,7 @@ class CursesUI(threading.Thread):
             elif self._last_key == 't':
                 return commands.Shutdown()
             elif self._last_key == 'b':
-                return commands.Brake()
+                return commands.Brake(1)
             elif self._last_key == 'h':
                 return commands.Hold()
             elif self._last_key == 'KEY_LEFT':

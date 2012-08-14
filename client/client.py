@@ -117,13 +117,14 @@ class RobotClient(object):
                         self.robot.go()
                     elif type(user_command) == commands.Stop:
                         self.robot.stop()
-                    elif type(user_command) == commands.Brake:
-                        self.robot.brake(100)  # TODO what does this do?
                     elif type(user_command) in (
-                            commands.Hold, commands.Drive, commands.Steer):
+                            commands.Brake, commands.Hold, commands.Drive, commands.Steer):
                         new_speeds = self.steering.parse_user_command(user_command)
-                        self.robot.set_speed(int(new_speeds['left']), 'left')
-                        self.robot.set_speed(int(new_speeds['right']), 'right')
+                        if type(user_command) == commands.Brake:
+                            self.robot.brake(int(new_speeds))
+                        else:
+                            self.robot.set_speed(int(new_speeds['left']), 'left')
+                            self.robot.set_speed(int(new_speeds['right']), 'right')
 
                 except RobotCommandError, e:
                     open('log', 'w+').write(str(e))

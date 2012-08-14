@@ -31,7 +31,12 @@ class Horn(object):
 
 class Brake(object):
     """Push the brake."""
-    pass
+    def __init__(self, speed=1):
+        """speed is between 0 for non-existent braking to 1 for rapid deceleration."""
+        self.speed = speed
+
+    def __repr__(self):
+        return 'Brake(speed=%.4f)' % self.speed
 
 class Hold(object):
     """Drive with the same speed."""

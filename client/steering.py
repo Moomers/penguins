@@ -7,6 +7,7 @@ class SteeringModel(object):
         self.last_status = status
 
         self.acceleration = 5
+        self.braking = 1
         self.turn_acceleration = 2
 
     def parse_user_command(self, command):
@@ -33,6 +34,9 @@ class SteeringModel(object):
             return {
                     'left':self.last_status['driver']['target left'] + left,
                     'right':self.last_status['driver']['target right'] + right}
+
+        elif type(command) == commands.Brake:
+            return self.last_status['driver']['braking_speed'] + self.braking * command.speed
 
         else:
             raise Exception("invalid steering command")
