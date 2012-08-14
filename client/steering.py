@@ -13,9 +13,14 @@ class SteeringModel(object):
     def parse_user_command(self, command):
         """Turns the latest user command into speed instructions for the robot"""
         if type(command) == commands.Hold:
-            return {
-                    'left':self.last_status['driver']['target left'],
-                    'right':self.last_status['driver']['target right']}
+            if self.last_status['driver']['braking speed']:
+                return {
+                        'brake':self.last_status['driver']['braking speed'],
+                        }
+            else:
+                return {
+                        'left':self.last_status['driver']['target left'],
+                        'right':self.last_status['driver']['target right']}
 
         elif type(command) == commands.Steer:
             speed = abs(command.direction)
@@ -36,7 +41,9 @@ class SteeringModel(object):
                     'right':self.last_status['driver']['target right'] + right}
 
         elif type(command) == commands.Brake:
-            return self.last_status['driver']['braking speed'] + self.braking * command.speed
+            return {
+                    'brake':self.last_status['driver']['braking speed'] + self.braking * command.speed
+                    }
 
         else:
             raise Exception("invalid steering command")

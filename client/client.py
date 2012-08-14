@@ -125,8 +125,8 @@ class RobotClient(object):
                     elif type(user_command) in (
                             commands.Brake, commands.Hold, commands.Drive, commands.Steer):
                         new_speeds = self.steering.parse_user_command(user_command)
-                        if type(user_command) == commands.Brake:
-                            self.robot.brake(int(new_speeds))
+                        if 'brake' in new_speeds:
+                            self.robot.brake(int(new_speeds['brake']))
                         else:
                             self.robot.set_speed(int(new_speeds['left']), 'left')
                             self.robot.set_speed(int(new_speeds['right']), 'right')
