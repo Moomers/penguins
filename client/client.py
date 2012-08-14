@@ -6,6 +6,7 @@ import threading
 
 from optparse import OptionParser, OptionGroup
 
+import commands
 import cursesui
 import joyride
 import framebuffer
@@ -102,24 +103,22 @@ class RobotClient(object):
             user_command = self.ui.get_command()
             if user_command:
                 try:
-                    if user_command[0] == 'quit':
+                    if type(user_command) == commands.Quit:
                         self.robot.disconnect()
                         break
-                    elif user_command[0] == 'shutdown':
+                    elif type(user_command) == commands.Shutdown:
                         self.robot.shutdown()
                         break
-                    elif user_command[0] == 'reset':
+                    elif type(user_command) == commands.Reset:
                         self.robot.reset()
-
-                    elif user_command[0] == 'go':
+                    elif type(user_command) == commands.Go:
                         self.robot.go()
-                    elif user_command[0] == 'stop':
+                    elif type(user_command) == commands.Stop:
                         self.robot.stop()
-                    elif user_command[0] == 'brake':
-                        self.robot.brake(user_command[1])
-
-                    elif user_command[0] in (
-                            'hold', 'forward', 'back', 'left', 'right'):
+                    elif type(user_command) == commands.Brake:
+                        self.robot.brake(100)  # TODO what does this do?
+                    elif type(user_command) in (
+                            commands.Hold, commands.Drive, commands.Steer):
                         new_speeds = self.steering.parse_user_command(user_command)
                         self.robot.set_speed(int(new_speeds['left']), 'left')
                         self.robot.set_speed(int(new_speeds['right']), 'right')
@@ -146,9 +145,9 @@ def main():
     parser = OptionParser()
 
     uigroup = OptionGroup(parser, "UI options")
-    uigroup.add_option('-u', '--ui', action="store", type="choice", dest="ui", default="curses", choices=uilist.keys(),
+    uigroup.add_option('-u', '--ui', action="store", type="choice", dest="ui", default="joyride", choices=uilist.keys(),
             help="Interact with this type of UI [Default: joyride]")
-    uigroup.add_option('-j', '--joystick', action="store", type="string", dest="joystick", default=None,
+    uigroup.add_option('-j', '--joystick', action="store", type="string", dest="joystick_device", default=None,
             help="Path to the device file of the joystick (for joyride UI) [Default: None]")
     uigroup.add_option('-s', '--disable-sound', action="store_false", dest="sound", default=True,
             help="Disable sound [Default: False]")

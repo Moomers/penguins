@@ -4,26 +4,6 @@
 __author__ = 'Jered Wierzbicki'
 
 
-class Horn(object):
-    """Push the horn."""
-
-    def __init__(self, pressed=False):
-        self.pressed = pressed
-
-    def __repr__(self):
-        return 'Horn(pressed=%d)' % self.pressed
-
-
-class Brake(object):
-    """Push the brake."""
-
-    def __init__(self, pressed=False):
-        self.pressed = pressed
-
-    def __repr__(self):
-        return 'Brake(pressed=%d)' % self.pressed
-
-
 class Steer(object):
     """Steer left or right."""
 
@@ -45,12 +25,34 @@ class Drive(object):
     def __repr__(self):
         return 'Drive(speed=%.4f)' % self.speed
 
+class Horn(object):
+    """Sound the horn."""
+    pass
+
+class Brake(object):
+    """Push the brake."""
+    pass
+
+class Hold(object):
+    """Drive with the same speed."""
+    pass
 
 class Reset(object):
     """Reset the controller."""
+    pass
 
-    def __init__(self, pressed=False):
-        self.pressed = pressed
+class Stop(object):
+    """Puts the penguin into emergency stop."""
+    pass
 
-    def __repr__(self):
-        return 'Reset(pressed=%d)' % self.pressed
+class Shutdown(object):
+    """Shuts down the server."""
+    pass
+
+class Go(object):
+    """Takes the penguin out of emergency stop."""
+    pass
+
+class Quit(object):
+    """Quits the client."""
+    pass

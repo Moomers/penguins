@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import commands
 import curses
 import time
 import threading
@@ -136,30 +137,27 @@ class CursesUI(threading.Thread):
         """Returns the user's last command"""
         try:
             if self._last_key == 'q':
-                return ('quit', None)
-
+                return commands.Quit()
             elif self._last_key == 'g':
-                return ('go', None)
-
+                return commands.Go()
             elif self._last_key == 'r':
-                return ('reset', None)
+                return commands.Reset()
             elif self._last_key == 's':
-                return ('stop', None)
+                return commands.Stop()
             elif self._last_key == 't':
-                return ('shutdown', None)
-
+                return commands.Shutdown()
             elif self._last_key == 'b':
-                return ('brake', 100)
+                return commands.Brake()
             elif self._last_key == 'h':
-                return ('hold', None)
-            elif self._last_key == 'KEY_UP':
-                return ('forward', (0, 1, 0))
+                return commands.Hold()
             elif self._last_key == 'KEY_LEFT':
-                return ('left', 1)
+                return commands.Steer(direction=-1)
             elif self._last_key == 'KEY_RIGHT':
-                return ('right', 1)
+                return commands.Steer(direction=1)
             elif self._last_key == 'KEY_DOWN':
-                return ('back', (0, 1, 0))
+                return commands.Drive(speed=-1)
+            elif self._last_key == 'KEY_UP':
+                return commands.Drive(speed=1)
 
             else:
                 return None
@@ -187,7 +185,7 @@ if __name__ == "__main__":
             command = ui.get_command()
             if not command:
                 continue
-            if command[0] == 'quit':
+            if type(command) == commands.Quit:
                 break
             else:
                 ui.write_result("command was %s" % str(command))
