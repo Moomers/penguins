@@ -148,8 +148,10 @@ class SabertoothDriver(object):
                 'target left':self.target_speeds[0],
                 'target right':self.target_speeds[1],
                 'last left':self.last_speeds[0],
-                'last_right':self.last_speeds[1],
-                'last_speed_update':self.last_speed_update,
+                'last right':self.last_speeds[1],
+                'last speed update':self.last_speed_update,
+                'braking':self.braking,
+                'braking speed':self.braking_speed,
                 }
 
 def get_driver(robot, **rest):
