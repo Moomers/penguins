@@ -47,15 +47,13 @@ class Robot(object):
         self._send_command('exit')
         self.sock.close()
 
-    def shutdown(self):
-        """Shuts down the robot, which also disconnects this client"""
-        self._send_command('shutdown')
-        self.sock.close()
-        return True
-
     def become_controller(self):
         """Becomes the exclusive client driving the robot"""
         return self._send_command('control')
+
+    def shutdown(self):
+        """Tells the server to shut itself down."""
+        self._send_command('shutdown')
 
     ###### the interface of the driver #####
     def brake(self, speed):
