@@ -67,7 +67,7 @@ class SabertoothDriver(object):
         elif speed > self.max_braking:
             raise common.ParameterError("Braking speed %d exceeds maximum value of %d" % (speed, self.max_braking))
 
-        self.target_speed = [0,0]
+        self.target_speeds = [0,0]
         self.braking_speed = speed
         self.braking = True
 

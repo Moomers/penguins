@@ -36,7 +36,7 @@ class SteeringModel(object):
                     'right':self.last_status['driver']['target right'] + right}
 
         elif type(command) == commands.Brake:
-            return self.last_status['driver']['braking_speed'] + self.braking * command.speed
+            return self.last_status['driver']['braking speed'] + self.braking * command.speed
 
         else:
             raise Exception("invalid steering command")
