@@ -134,7 +134,7 @@ class ConnectionHandler(SocketServer.StreamRequestHandler):
                     if self.controller:
                         self.send_output('ok', 'was already a controller')
                     else:
-                        self.controller = self.server.robot.control_lock.acquire()
+                        self.controller = self.server.robot.control_lock.acquire(blocking = 0)
                         if self.controller:
                             self.send_output('ok', 'acquired control lock')
                         else:
