@@ -77,7 +77,7 @@ Sonar::~Sonar() {
 }
 
 void Sonar::read() {
-  unsigned long pulse = pulseIn(pin_, HIGH);
+  unsigned long pulse = pulseIn(pin_, HIGH, 20000);
   last_value_ = pulse / 147; //147 uS per inch
 }
 
