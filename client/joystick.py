@@ -14,6 +14,9 @@ import threading
 
 __author__ = 'Jered Wierzbicki'
 
+class JoystickError(Exception):
+    """Used to signify a joystick problem"""
+    pass
 
 class RawEvent(object):
     """An event reported by the joystick driver."""
@@ -24,7 +27,7 @@ class RawEvent(object):
     # Event types:
     BUTTON = 1  # Button press.
     AXIS = 2  # Movement on some axis (a delta).
-    INIT = 128  # Synthetic mask for first 
+    INIT = 128  # Synthetic mask for first
 
     def __init__(self, time=0, value=0, event_type=0, number=0):
         self.time = time
@@ -142,6 +145,7 @@ class Listener(threading.Thread):
             if not rlist:
                 # Spin to check for stop signal.
                 continue
+
             data = self.device.read(RawEvent.BYTES)
             event = RawEvent.Unpack(data)
             self.events_lock.acquire()
@@ -179,6 +183,9 @@ class Joystick(object):
 
     def get_event(self):
         """Returns True iff the joystick has pending events."""
+        if not self.listener.is_alive():
+            raise JoystickError("listener has terminated")
+
         event = self.listener.get_event()
         if event:
             return self.profile.interpret(event)
