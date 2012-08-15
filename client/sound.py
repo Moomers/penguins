@@ -23,8 +23,12 @@ class Mixer(threading.Thread):
         self.pyaudio = pyaudio.PyAudio()
         self._stop = threading.Event()
 
-    def stop(self):
+    def stop(self, final_sound = None):
         self._stop.set()
+        self.join()
+        if final_sound:
+            self._play(final_sound)
+
         self.pyaudio.terminate()
 
     def run(self):
@@ -66,8 +70,8 @@ class SoundPlayer(object):
     def play(self, sound):
         self.mixer.queue(sound)
 
-    def stop(self):
-        self.mixer.stop()
+    def stop(self, final_sound = None):
+        self.mixer.stop(final_sound)
         self.mixer.join()
 
     def update_status(self, new_status):

@@ -235,9 +235,7 @@ def main():
                 ui.stop()
         finally:
             if player:
-                player.play(player.SOUNDS['crash'])
-                time.sleep(5)
-                player.stop()
+                player.stop(player.SOUNDS['crash'])
     finally:
         if not robot.disconnected:
             robot.disconnect()
