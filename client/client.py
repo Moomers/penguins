@@ -12,6 +12,7 @@ import joyride
 import framebuffer
 import sound
 import steering
+import time
 
 class RobotCommandError(Exception):
     """Used when a robot command cannot be executed"""
@@ -94,11 +95,11 @@ class Robot(object):
 
 class RobotClient(object):
     """Controls the robot"""
-    def __init__(self, robot, ui, steering_model, sound):
+    def __init__(self, robot, ui, steering_model, player):
         self.robot = robot
         self.ui = ui
         self.steering = steering_model
-        self.sound = sound
+        self.player = player
 
         self._stop = threading.Event()
 
@@ -114,8 +115,8 @@ class RobotClient(object):
                     elif type(user_command) == commands.Shutdown:
                         self.robot.shutdown()
                         break
-                    elif type(user_command) == commands.Horn and self.sound:
-                        self.sound.play_honk()
+                    elif type(user_command) == commands.Horn and self.player:
+                        self.player.play(self.player.SOUNDS['honk'])
                     elif type(user_command) == commands.Reset:
                         self.robot.reset()
                     elif type(user_command) == commands.Go:
@@ -139,8 +140,8 @@ class RobotClient(object):
             self.ui.update_status(status)
             self.steering.update_status(status)
 
-            if self.sound:
-                self.sound.update_status(status)
+            if self.player:
+                self.player.update_status(status)
 
 def main():
     """If run directly, we will connect to a server and run the specified UI"""
@@ -200,6 +201,7 @@ def main():
 
         if options.sound:
             player = sound.SoundPlayer(status)
+            player.play(player.SOUNDS['startup'])
         else:
             player = None
 
@@ -207,7 +209,7 @@ def main():
         client = RobotClient(robot, ui, steerer, player)
 
         # start up all the pieces in the right order
-        player.start()
+        if player: player.start()
         try:
             ui.init()
             ui.start()
@@ -216,7 +218,10 @@ def main():
             finally:
                 ui.stop()
         finally:
-            player.stop()
+            if player:
+                player.play(player.SOUNDS['crash'])
+                time.sleep(5)
+                player.stop()
     finally:
         if not robot.disconnected:
             robot.disconnect()
