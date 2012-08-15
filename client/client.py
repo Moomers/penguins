@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import cPickle as pickle
+import logging
 import socket
 import threading
+import time
 
 from optparse import OptionParser, OptionGroup
 
@@ -12,7 +14,6 @@ import joyride
 import framebuffer
 import sound
 import steering
-import time
 
 class RobotCommandError(Exception):
     """Used when a robot command cannot be executed"""
@@ -145,7 +146,7 @@ class RobotClient(object):
                             self.robot.set_speed(int(new_speeds['right']), 'right')
 
                 except RobotCommandError, e:
-                    open('log', 'w+').write(str(e))
+                    logging.error(str(e))
                     self.ui.error_notify(e)
 
             status = self.robot.get_status()
