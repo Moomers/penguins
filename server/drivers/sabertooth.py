@@ -116,7 +116,9 @@ class SabertoothDriver(object):
         for i in (0, 1):
             # what is our maximum acceleration speed?
             # if we're actively braking, we can change at up to brake speed
-            if self.braking_speed and abs(target_speeds[i]) < self.last_speeds[i]:
+            # never use braking to accelerate though; in that case, use
+            # normal acceleration model
+            if self.braking_speed and abs(target_speeds[i]) < abs(self.last_speeds[i]):
                 max_diff = self.braking_speed
             # otherwise we're accelerating/decellerating normally
             else:
