@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO,
 
 def get_server_process():
     for p in psutil.process_iter():
-        if 'python' in p.cmdline and 'server.py' in p.cmdline:
+        if p.cmdline == ['/usr/bin/python', '/root/penguins/server/server.py']:
             return p
 
 # log the next time these events happen

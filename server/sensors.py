@@ -86,7 +86,7 @@ class Sonar(ArduinoConnectedSensor):
 
 class Encoder(ArduinoConnectedSensor):
     """A magnetic encoder reading the wheel speed via a hall effect sensor"""
-    def __init__(self, robot, key, magnets = 1, window = 2):
+    def __init__(self, robot, key, magnets = 2, window = 2):
         ArduinoConnectedSensor.__init__(self, robot, key)
 
         self.magnets = magnets

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Functionality to play sounds in response to events"""
 
+import glob
 import os
 import pyaudio
 import Queue
@@ -8,16 +9,9 @@ import threading
 import time
 import wave
 
-SOUND_DIR = '../sounds/joyride'
-
 class Sound(object):
-    def __init__(self, name):
-        self.wf = wave.open(os.path.join(SOUND_DIR, name + '.wav'), 'rb')
-
-SOUNDS = dict((name, Sound(name))
-              for name in ['ebrake', 'honk', 'yay', 'screech',
-                           'tada', 'uhoh', 'smb_bump', 'smb_warning',
-                           'hothothot', 'relief'])
+    def __init__(self, path):
+        self.wf = wave.open(path, 'rb')
 
 class Mixer(threading.Thread):
     CHUNKSIZE = 1024
@@ -59,6 +53,9 @@ class Mixer(threading.Thread):
         stream.close()
 
 class SoundPlayer(object):
+    SOUNDS = dict((os.path.basename(name)[:-4], Sound(name))
+                  for name in glob.glob('../sounds/*.wav'))
+
     def __init__(self, status):
         self.last_status = status
         self.mixer = Mixer()
@@ -66,8 +63,8 @@ class SoundPlayer(object):
     def start(self):
         self.mixer.start()
 
-    def play_honk(self):
-        self.mixer.queue(SOUNDS['honk'])
+    def play(self, sound):
+        self.mixer.queue(sound)
 
     def stop(self):
         self.mixer.stop()
@@ -75,11 +72,43 @@ class SoundPlayer(object):
 
     def update_status(self, new_status):
         """Go through the new status and play sounds for any new alerts"""
+        def became_set(key, old, new): return not old[key] and new[key]
+        def became_cleared(key, old, new): return old[key] and not new[key]
+
+        old, new = self.last_status['arduino'], new_status['arduino']
+        if became_set('estop', old, new):
+            self.mixer.queue(self.SOUNDS['estop'])
+        elif became_cleared('estop', old, new):
+            self.mixer.queue(self.SOUNDS['clear_estop'])
+        if became_set('healthy', old, new):
+            self.mixer.queue(self.SOUNDS['arduino_healthy'])
+        elif became_cleared('healthy', old, new):
+            self.mixer.queue(self.SOUNDS['arduino_unhealthy'])
+
+        old, new = self.last_status['monitor']['alerts'], new_status['monitor']['alerts']
+        if became_set('Driver overtemp estop', old, new):
+            self.mixer.queue(self.SOUNDS['driver_estop_set'])
+        elif became_cleared('Driver overtemp estop', old, new):
+            self.mixer.queue(self.SOUNDS['driver_estop_clear'])
+        if became_set('Driver overtemp warn', old, new):
+            self.mixer.queue(self.SOUNDS['driver_warn'])
+        if became_set('Battery estop', old, new):
+            self.mixer.queue(self.SOUNDS['battery_estop_set'])
+        elif became_cleared('Battery estop', old, new):
+            self.mixer.queue(self.SOUNDS['battery_estop_clear'])
+        if became_set('Battery warn', old, new):
+            self.mixer.queue(self.SOUNDS['battery_warn'])
+        if became_set('Sonar warn', old, new):
+            self.mixer.queue(self.SOUNDS['sonar_warn'])
+        if became_set('Encoder warn', old, new):
+            pass
+            #self.mixer.queue(self.SOUNDS['encoder_warn'])
+
         self.last_status = new_status
 
 if __name__ == "__main__":
     mixer = Mixer()
     mixer.start()
-    mixer.queue(SOUNDS['tada'])
+    mixer.queue(SoundPlayer.SOUNDS['startup'])
     time.sleep(2)
     mixer.stop()
