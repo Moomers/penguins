@@ -124,7 +124,7 @@ class Listener(threading.Thread):
     """Listens for and queues joystick events."""
 
     def __init__(self, device_path):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='joystick-listener')
         self.setDaemon(True)
         self.device = open(device_path, 'rb', 0)
         self.events_lock = threading.Lock()

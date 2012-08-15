@@ -17,7 +17,7 @@ class Mixer(threading.Thread):
     CHUNKSIZE = 1024
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name = 'player_mixer')
         self.setDaemon(True)
         self._queue = Queue.Queue(0)
         self.pyaudio = pyaudio.PyAudio()
