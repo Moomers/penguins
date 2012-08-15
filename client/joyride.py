@@ -8,11 +8,13 @@ import threading
 
 class JoyrideUI(threading.Thread):
     def __init__(self, joystick_device=None):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="joyride_ui")
+
         # used to stop the UI loop
         self._stop = threading.Event()
         if joystick_device is None:
             joystick_device = '/dev/input/js0'
+
         self.js = joystick.Joystick(joystick_device, joystick.NESController())
 
     def init(self):

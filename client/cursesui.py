@@ -9,7 +9,7 @@ class CursesUI(threading.Thread):
     """A curses UI or talking to a driver via client"""
     def __init__(self):
         """Initializes ncurses"""
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='curses-ui')
 
         # used to stop the UI loop
         self._stop = threading.Event()
