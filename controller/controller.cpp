@@ -60,8 +60,6 @@ AnalogSensor temperature("DT", TemperaturePin);
 
 Sonar leftSonar("LS", LeftSonarPWPin);
 Sonar rightSonar("RS", RightSonarPWPin);
-Encoder leftEncoder("LE", LeftEncoderPin);
-Encoder rightEncoder("RE", RightEncoderPin);
 
 #if defined(USE_AMG)
 AMG amg("AMG");
@@ -74,8 +72,6 @@ Sensor* sensors[] = {
   &leftSonar,
   &rightSonar,
 
-  &leftEncoder,
-  &rightEncoder,
 #if defined(USE_AMG)
   &amg,
 #endif
@@ -145,8 +141,13 @@ void setup()
   sabertoothSerial.write(uint8_t(0));
 
   // initialize the interrupts on encoders
-  attachInterrupt(LeftEncoderPin - 2, left_encoder_interrupt, RISING);
-  attachInterrupt(RightEncoderPin - 2, right_encoder_interrupt, RISING);
+  pinMode(LeftEncoderPin, INPUT);           // set pin to input
+  digitalWrite(LeftEncoderPin, HIGH);       // turn on pullup resistors
+  attachInterrupt(LeftEncoderPin - 2, left_encoder_interrupt, FALLING);
+
+  pinMode(RightEncoderPin, INPUT);           // set pin to input
+  digitalWrite(RightEncoderPin, HIGH);       // turn on pullup resistors
+  attachInterrupt(RightEncoderPin - 2, right_encoder_interrupt, FALLING);
 
   // initialize the led pin
   pinMode(StoppedLEDPin, OUTPUT);
@@ -201,12 +202,14 @@ void loop()
 }
 
 // interrupt functions for logging encoder events
+volatile int LEFT_PULSES = 0;
 void left_encoder_interrupt() {
-  leftEncoder.log_rotation();
+  LEFT_PULSES++;
 }
 
+volatile int RIGHT_PULSES = 0;
 void right_encoder_interrupt() {
-  rightEncoder.log_rotation();
+  RIGHT_PULSES++;
 }
 
 void read_sensor_state() {
@@ -291,6 +294,14 @@ void send_state(unsigned long now)
     Serial.print(sensors[i]->get_data());
     Serial.print(";");
   }
+
+  // special handling for encoders
+  Serial.print("LE:");
+  Serial.print(LEFT_PULSES);
+  Serial.print(";");
+  Serial.print("RE:");
+  Serial.print(RIGHT_PULSES);
+  Serial.print(";");
 
   Serial.print("\r\n");
 
