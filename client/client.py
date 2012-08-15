@@ -94,18 +94,30 @@ class Robot(object):
 
 class RobotClient(object):
     """Controls the robot"""
-    def __init__(self, robot, ui, steering_model, sound):
+    def __init__(
+            self, robot, ui, steering_model, sound, allow_control = True, become_controller = False):
         self.robot = robot
         self.ui = ui
         self.steering = steering_model
         self.sound = sound
 
+        self.allow_control = allow_control
+        self.become_controller = become_controller
+
         self._stop = threading.Event()
 
     def run(self):
         """Main loop which drives the robot"""
+        if self.become_controller:
+            self.robot.become_controller()
+
         while not self._stop.is_set():
             user_command = self.ui.get_command()
+
+            # if we don't allow control, then only allow quit command
+            if not self.allow_control and type(user_command) != commands.Quit:
+                user_command = None
+
             if user_command:
                 try:
                     if type(user_command) == commands.Quit:
@@ -159,6 +171,10 @@ def main():
             help="Path to the device file of the joystick (for joyride UI) [Default: None]")
     uigroup.add_option('-s', '--disable-sound', action="store_false", dest="sound", default=True,
             help="Disable sound [Default: False]")
+    uigroup.add_option('-c', '--become-controller', action="store_true", dest="become_controller", default=False,
+            help="Become exclusive controlling connection [Default: False]")
+    uigroup.add_option('-n', '--no-control', action="store_false", dest="allow_control", default=True,
+            help="Ignore all UI commands from this client [Default: False]")
     uigroup.add_option("--list", action="store_true", dest="list", default=False,
             help="List the available UIs and exit")
     parser.add_option_group(uigroup)
@@ -204,7 +220,7 @@ def main():
             player = None
 
         # create the robot client
-        client = RobotClient(robot, ui, steerer, player)
+        client = RobotClient(robot, ui, steerer, player, options.allow_control, options.become_controller)
 
         # start up all the pieces in the right order
         player.start()
