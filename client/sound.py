@@ -101,7 +101,8 @@ class SoundPlayer(object):
         if became_set('Sonar warn', old, new):
             self.mixer.queue(self.SOUNDS['sonar_warn'])
         if became_set('Encoder warn', old, new):
-            self.mixer.queue(self.SOUNDS['encoder_warn'])
+            pass
+            #self.mixer.queue(self.SOUNDS['encoder_warn'])
 
         self.last_status = new_status
 

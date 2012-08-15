@@ -35,8 +35,8 @@ class CursesUI(threading.Thread):
         #initialize the status and result windows
         self.windows['time'] = self.create_window(' Time ', 3, 82, 0, 0)
 
-        self.windows['driver'] = self.create_window(' Driver Status ', 10, 40, 3, 0)
-        self.windows['monitor'] = self.create_window(' Monitor Status ', 10, 40, 3, 41)
+        self.windows['driver'] = self.create_window(' Driver Status ', 12, 40, 3, 0)
+        self.windows['monitor'] = self.create_window(' Monitor Status ', 12, 40, 3, 41)
         self.windows['arduino'] = self.create_window(' Arduino Status ', 10, 40, 14, 0)
         self.windows['sensors'] = self.create_window(' Sensor Status ', 10, 40, 14, 41)
         self.windows['result'] = self.create_window(' Last Result ', 3, 82, 25, 0)
@@ -124,8 +124,16 @@ class CursesUI(threading.Thread):
             window = self.windows[cat]
             linenum = 1
             for key, val in s.items():
-                self.write_key_value(window, linenum, key, val)
-                linenum += 1
+                if key == 'alerts':
+                    # print out monitor alerts
+                    self.write_line(window, linenum, 'Alerts:')
+                    linenum += 1
+                    for k, v in val.items():
+                        self.write_key_value(window, linenum, '  '+k, v)
+                        linenum += 1
+                else:
+                    self.write_key_value(window, linenum, key, val)
+                    linenum += 1
 
         sen_line = 1
         for sen in status['sensors']:

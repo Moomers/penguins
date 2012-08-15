@@ -4,7 +4,7 @@ driver = {
         'min_speed':5,
         'max_speed':95,
         'max_turn_speed':50,
-        'max_acceleration':1,
+        'max_acceleration':3,
         'max_braking':20,
         'speed_adjust':1,
         'left_speed_adjust':1,
@@ -17,7 +17,7 @@ monitor = {
         'client_timeout':5,
         'control_timeout_brake':3,
         'control_timeout_stop':8,
-        'timeout_brake_speed':1,
+        'timeout_brake_speed':2,
 
         'file_touch_path':'/tmp/server-monitor-alive',
         'file_touch_interval':1,
