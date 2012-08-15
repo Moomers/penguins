@@ -70,7 +70,6 @@ class SabertoothDriver(object):
 
         self.target_speeds = [0,0]
         self.braking_speed = speed
-        print "set brake speed to %s" % self.braking_speed
 
     def set_speed(self, speed, motor = 'both'):
         """sets the target speed of one or both motors"""
