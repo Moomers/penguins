@@ -2,6 +2,7 @@
 
 import time
 import traceback
+from collections import deque
 
 class Sensor(object):
     """This class defines an interface that all sensors must implement"""
@@ -27,18 +28,23 @@ class VoltageSensor(ArduinoConnectedSensor):
     def __init__(self, robot, key, R1 = 1, R2 = 1):
         ArduinoConnectedSensor.__init__(self, robot, key)
 
-        self.voltage = None
-
         # resistors used on the divider, in ohms
         self.ratio = float(R1 + R2) / float(R2)
+
+        self.readings = deque([0] * 20, 20)
+
+    @property
+    def voltage(self):
+        """Voltage is actually an average of several readings"""
+        return sum(self.readings)/len(self.readings)
 
     def read(self):
         """reads the raw millivolt value from the arduino and scales it by the voltage divider ratio"""
         reading = self._read()
-        if reading is None:
-            self.voltage = None
-        else:
-            self.voltage = self.ratio * float(reading.data) * 5 / 1023
+        if reading is not None:
+            voltage = self.ratio * float(reading.data) * 5 / 1023
+            self.readings.popleft()
+            self.readings.append(voltage)
 
         return self.voltage
 
@@ -52,13 +58,20 @@ class TemperatureSensor(ArduinoConnectedSensor):
         ArduinoConnectedSensor.__init__(self, robot, key)
         self.scaling_function = scaling_function
 
+        self.readings = deque([0]*20, 20)
+
+    @property
+    def temperature(self):
+        """Temperature is actually an average of the last X readings"""
+        return sum(self.readings)/len(self.readings)
+
     def read(self):
         reading = self._read()
-        if reading is None:
-            self.temperature = None
-        else:
+        if reading is not None:
             mV = float(reading.data) * (5.0 / 1023) * 1000
-            self.temperature = self.scaling_function(mV)
+            temperature = self.scaling_function(mV)
+            self.readings.popleft()
+            self.readings.append(temperature)
 
         return self.temperature
 
