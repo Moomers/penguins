@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import time
-import traceback
 from collections import deque
 
 class Sensor(object):
@@ -99,40 +98,56 @@ class Sonar(ArduinoConnectedSensor):
 
 class Encoder(ArduinoConnectedSensor):
     """A magnetic encoder reading the wheel speed via a hall effect sensor"""
-    def __init__(self, robot, key, magnets = 2, window = 2):
+    def __init__(self, robot, key, magnets = 2, min_interval = 2):
         ArduinoConnectedSensor.__init__(self, robot, key)
 
-        self.magnets = magnets
-        self.window = window
+        self.magnets = float(magnets)
+        self.min_interval = min_interval
 
-        self.rpm = None
         self.readings = []
+
+    @property
+    def rpm(self):
+        try:
+            first, last = (self.readings[0], self.readings[-1])
+        except:
+            first, last = (None, None)
+
+        if first is None or last is None or first == last:
+            return 0
+
+        interval = first.timestamp - last.timestamp
+        pulses = int(first.data) - int(last.data)
+        rpms = (float(pulses) / self.magnets) * (60.0 / interval)
+        return rpms
 
     def read(self):
         """Process the RPMs of the encoder"""
-        # try adding a new reading from the sensor to the list of readings
         reading = self._read()
-        if reading is not None and (len(self.readings) == 0 or reading.timestamp > self.readings[-1].timestamp):
-            reading.data = int(reading.data)
+
+        # do we add this new reading to the list?
+        # ignore null readings
+        if reading is None:
+            pass
+
+        # always add if we have nothing else
+        elif len(self.readings) == 0:
             self.readings.append(reading)
 
-        # get rid of stale readins that don't fit into the current window
-        now = time.time()
-        not_stale = 0
-        while not_stale < len(self.readings) and self.readings[not_stale].timestamp < (now - self.window):
-            not_stale += 1
-        self.readings = self.readings[not_stale:]
+        # don't double-add
+        elif reading.timestamp == self.readings[-1].timestamp:
+            pass
 
-
-        # count the number of pulses in the current window; pulse count is monotonically increasing
-        if len(self.readings) < 2:
-            pulses = 0
-            time_period = self.window
+        # finally, add remaining readings
         else:
-            pulses = self.readings[-1].data - self.readings[0].data
-            time_period = now - self.readings[0].timestamp
+            self.readings.append(reading)
 
-        self.rpm = (pulses / self.magnets) * (60 / time_period)
+
+        # now prune old readings
+        now = time.time()
+        pruned = [r for r in self.readings if (now - r.timestamp) < self.min_interval]
+        self.readings = pruned
+
         return self.rpm
 
     @property
