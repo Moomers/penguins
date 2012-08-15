@@ -95,18 +95,30 @@ class Robot(object):
 
 class RobotClient(object):
     """Controls the robot"""
-    def __init__(self, robot, ui, steering_model, player):
+    def __init__(
+            self, robot, ui, steering_model, player, allow_control = True, become_controller = False):
         self.robot = robot
         self.ui = ui
         self.steering = steering_model
         self.player = player
 
+        self.allow_control = allow_control
+        self.become_controller = become_controller
+
         self._stop = threading.Event()
 
     def run(self):
         """Main loop which drives the robot"""
+        if self.become_controller:
+            self.robot.become_controller()
+
         while not self._stop.is_set():
             user_command = self.ui.get_command()
+
+            # if we don't allow control, then only allow quit command
+            if not self.allow_control and type(user_command) != commands.Quit:
+                user_command = None
+
             if user_command:
                 try:
                     if type(user_command) == commands.Quit:
@@ -126,8 +138,8 @@ class RobotClient(object):
                     elif type(user_command) in (
                             commands.Brake, commands.Hold, commands.Drive, commands.Steer):
                         new_speeds = self.steering.parse_user_command(user_command)
-                        if type(user_command) == commands.Brake:
-                            self.robot.brake(int(new_speeds))
+                        if 'brake' in new_speeds:
+                            self.robot.brake(int(new_speeds['brake']))
                         else:
                             self.robot.set_speed(int(new_speeds['left']), 'left')
                             self.robot.set_speed(int(new_speeds['right']), 'right')
@@ -160,6 +172,10 @@ def main():
             help="Path to the device file of the joystick (for joyride UI) [Default: None]")
     uigroup.add_option('-s', '--disable-sound', action="store_false", dest="sound", default=True,
             help="Disable sound [Default: False]")
+    uigroup.add_option('-c', '--become-controller', action="store_true", dest="become_controller", default=False,
+            help="Become exclusive controlling connection [Default: False]")
+    uigroup.add_option('-n', '--no-control', action="store_false", dest="allow_control", default=True,
+            help="Ignore all UI commands from this client [Default: False]")
     uigroup.add_option("--list", action="store_true", dest="list", default=False,
             help="List the available UIs and exit")
     parser.add_option_group(uigroup)
@@ -206,7 +222,7 @@ def main():
             player = None
 
         # create the robot client
-        client = RobotClient(robot, ui, steerer, player)
+        client = RobotClient(robot, ui, steerer, player, options.allow_control, options.become_controller)
 
         # start up all the pieces in the right order
         if player: player.start()
