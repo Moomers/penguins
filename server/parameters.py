@@ -23,4 +23,17 @@ monitor = {
         'file_touch_interval':1,
 
         'loop_min_interval':.05,
+
+        'driver_safe_temperature':30,
+        'driver_warn_temperature':40,
+        'driver_estop_temperature':70,
+        'battery_safe_voltage':22,
+        'battery_warn_voltage':20,
+        'battery_estop_voltage':15,
+
+        'sonar_warn_distance':40,
+        'sonar_safe_distance':60,
+
+        'encoder_safe_delta':100,
+        'encoder_warn_delta':200,
         }
