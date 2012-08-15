@@ -125,7 +125,7 @@ class ServerMonitor(threading.Thread):
                 for sensor in self.robot.sensors.values():
                     sensor.read()
 
-                self.safety_checker.update(self.robot.sensors)
+                self.safety_checker.check(self.robot.sensors)
                 if self.safety_checker.should_estop():
                     self.robot.driver.stop()
 
