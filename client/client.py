@@ -173,6 +173,8 @@ def main():
             help="Path to the device file of the joystick (for joyride UI) [Default: None]")
     uigroup.add_option('-s', '--disable-sound', action="store_false", dest="sound", default=True,
             help="Disable sound [Default: False]")
+    uigroup.add_option('-i', '--disable-input', action="store_false", dest="allow_input", default=True,
+            help="Disable input [Default: False]")
     uigroup.add_option('-c', '--become-controller', action="store_true", dest="become_controller", default=False,
             help="Become exclusive controlling connection [Default: False]")
     uigroup.add_option('-n', '--no-control', action="store_false", dest="allow_control", default=True,

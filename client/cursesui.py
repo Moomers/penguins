@@ -7,12 +7,15 @@ import threading
 
 class CursesUI(threading.Thread):
     """A curses UI or talking to a driver via client"""
-    def __init__(self):
+    def __init__(self, allow_input):
         """Initializes ncurses"""
         threading.Thread.__init__(self, name='curses-ui')
 
         # used to stop the UI loop
         self._stop = threading.Event()
+
+        # if False, ignore all comnmands, just print status
+        self.allow_input = allow_input
 
         # keep track of the last keystroke
         # it is cleared and returned by get_command
@@ -56,10 +59,11 @@ class CursesUI(threading.Thread):
             for window in self.windows.values():
                 window.refresh()
 
-            try:
-                self._last_key = self.stdscr.getkey()
-            except:
-                pass
+            if self.allow_input:
+                try:
+                    self._last_key = self.stdscr.getkey()
+                except:
+                    pass
 
     def stop(self):
         """Stops the UI loop"""
@@ -178,8 +182,8 @@ class CursesUI(threading.Thread):
         """Displays the error in the results window"""
         self.write_result("Error at %.2f: %s" % (time.time(), str(error)))
 
-def get_ui(**options):
-    return CursesUI()
+def get_ui(allow_input, **rest):
+    return CursesUI(allow_input)
 
 if __name__ == "__main__":
     ui = get_ui()

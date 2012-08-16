@@ -37,5 +37,5 @@ class JoyrideUI(threading.Thread):
     def error_notify(self, error):
         print error
 
-def get_ui(**options):
-    return JoyrideUI(joystick_device=options['joystick_device'])
+def get_ui(joystick_device, **rest):
+    return JoyrideUI(joystick_device)
