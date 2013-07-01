@@ -87,7 +87,6 @@ static struct State {
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
-void emergency_stop();
 void toggle_led();
 
 // begin code
@@ -131,17 +130,9 @@ void loop()
     sensors[i]->read();
   }
 
-  // set the speed properly
-  long speed = vertical.value();
-  // clamp between max and min sane values
-  if (speed > 1000) {
-    speed = 1000;
-  } else if (speed < 0) {
-    speed = 0;
-  }
-
-  // determine sabertooth speed from stick position
   // speed is from 100 to -100
+  long speed = clamp(vertical.value(), 0, 1000);
+
   if (speed > 650) {
     speed = (speed - 600) / 4;
   } else if (speed < 350) {
@@ -150,17 +141,13 @@ void loop()
     speed = 0;
   }
 
+  // we wired the joystick backwards...
   speed = -speed;
 
-  // modify for left/right
-  long direction = horizontal.value();
-  if (direction > 1000) {
-      direction = 1000;
-  } else if (direction < 0) {
-      direction = 0;
-  }
+  // direction is between 0 and 100
+  // 50 is in the middle, 0 is all the way to the left
+  long direction = clamp(horizontal.value(), 0, 1000);
 
-  // >500 means joystick is pointing left
   if (direction > 650) {
     direction = 50 + (direction - 600) / 8;
   } else if (direction < 350) {
@@ -172,18 +159,7 @@ void loop()
   int left = (2 * speed * direction * 30) / (100 * 100);
   int right = (2 * speed * (100 - direction) * 30) / (100 * 100);
 
-  Serial.print("V/H raw:");
-  Serial.print(vertical.value());
-  Serial.print("/");
-  Serial.print(horizontal.value());
-  Serial.print(";");
-
-  Serial.print(" -- left/right speed:");
-  Serial.print(left);
-  Serial.print("/");
-  Serial.print(right);
-  Serial.print("\r\n");
-
+  send_velocity_to_computer(left, right);
   send_velocity_to_sabertooth(left, right);
 
   // toggle the run led every time
@@ -218,19 +194,27 @@ void send_velocity_to_sabertooth(int left, int right)
   right = clamp(right, -63, 63);
 
   if (left == 0 && right == 0) {
+    digitalWrite(StoppedLEDPin, HIGH);
     sabertoothSerial.write(uint8_t(0));
   } else {
+    digitalWrite(StoppedLEDPin, LOW);
     sabertoothSerial.write(uint8_t(64 + left));
     sabertoothSerial.write(uint8_t(192 + right));
   }
 }
 
-  
-void emergency_stop() 
-{
-  state.emergencyStop = true;
-  digitalWrite(StoppedLEDPin, HIGH);
-  send_velocity_to_sabertooth(0,0);
+void send_velocity_to_computer(left, right) {
+  Serial.print("V/H raw:");
+  Serial.print(vertical.value());
+  Serial.print("/");
+  Serial.print(horizontal.value());
+  Serial.print(";");
+
+  Serial.print(" -- left/right speed:");
+  Serial.print(left);
+  Serial.print("/");
+  Serial.print(right);
+  Serial.print("\r\n");
 }
 
 void toggle_led()
