@@ -47,12 +47,6 @@ const byte StoppedLEDPin = 11;
 const byte WarnLEDPin = 12;
 const byte RunLEDPin = 13;
 
-
-/*************** Constants *********************/
-
-const unsigned long EmergencyBrakeMS = 1000;
-const unsigned long StateSendMS = 50;
-
 /*************** Globals *********************/
 
 // Sabertooth serial interface is unidirectional, so only TX is really needed
@@ -66,10 +60,6 @@ AnalogSensor temperature("DT", TemperaturePin);
 Sonar leftSonar("LS", LeftSonarPWPin);
 Sonar rightSonar("RS", RightSonarPWPin);
 
-#if defined(USE_AMG)
-AMG amg("AMG");
-#endif
-
 Sensor* sensors[] = {
   &horizontal,
   &vertical,
@@ -79,56 +69,21 @@ Sensor* sensors[] = {
 
   &leftSonar,
   &rightSonar,
-
-#if defined(USE_AMG)
-  &amg,
-#endif
 };
 
 const unsigned int NumSensors = sizeof(sensors) / sizeof(sensors[0]);
 
 /*************** Data Types  *********************/
 
-struct SerialCommand {
-  enum Type {
-    BAD = -1,
-    NONE = 0,
-    HEARTBEAT = 1,
-    VELOCITY = 2,
-    GO = 3,
-    GETSTATE = 4,
-    STOP = 5,
-  };
-  SerialCommand() : type(BAD), leftVelocity(0), rightVelocity(0) { }
-  SerialCommand(Type t) : type(t), leftVelocity(0), rightVelocity(0) { }
-
-  Type type;
-  int leftVelocity;
-  int rightVelocity;
-};
-
 static struct State {
-  State() : badCommandsReceived(0),
-    commandsReceived(0),
-    lastCommandTimestamp(0),
-    lastStateSentTimestamp(0),
-    emergencyStop(false),
+  State() : emergencyStop(false),
     runLED(false) { }
-  unsigned long badCommandsReceived;
-  unsigned long commandsReceived;
-  unsigned long lastCommandTimestamp;
-  unsigned long lastStateSentTimestamp;
   bool emergencyStop;
   bool runLED;
 } state;
 
 /*************** Prototypes  *********************/
 
-const char* scan_int(const char* buf, int* value);
-SerialCommand parse_command_buffer(const char* buf, int len);
-SerialCommand read_server_command();
-void execute_command(const SerialCommand& cmd);
-void send_state(unsigned long now);
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
@@ -164,49 +119,75 @@ void setup()
 
   // turn on the warn led to indicate a recent reset
   digitalWrite(WarnLEDPin, HIGH);
-
-  // go into emergency stop to begin with
-  emergency_stop();
 }
 
 void loop()
 {
   //read out the sensors
-  //if sensor data is strange, stop the bot
+  for(unsigned int i = 0; i < NumSensors; i++) {
+    if (!sensors[i])
+      continue;
 
-  // get the current time
-  unsigned long now = millis();
-  // if time overflows, reset last command timestamp to now instead of
-  // having a ridiculous overflow. this happens every 50 days, so every
-  // 50 days, penguin will take twice as long to ebrake.
-  if (state.lastCommandTimestamp > now)
-    state.lastCommandTimestamp = now;
-
-  // communicate with the server
-  send_state(now);
-  SerialCommand cmd = read_server_command();
-
-  if (cmd.type == SerialCommand::NONE ||
-      cmd.type == SerialCommand::BAD) {
-    // no command was received
-    // if too long since server sent something, stop
-    if (now - state.lastCommandTimestamp > EmergencyBrakeMS) {
-      if (!state.emergencyStop)
-          emergency_stop();
-    }
-
-    // log receiving bad commands
-    if (cmd.type == SerialCommand::BAD) {
-      state.badCommandsReceived++;
-    }
-
-  // got a good command from the server; log and execute
-  } else {
-    state.lastCommandTimestamp = now;
-    state.commandsReceived++;
-    execute_command(cmd);
-    digitalWrite(WarnLEDPin, LOW);
+    sensors[i]->read();
   }
+
+  // set the speed properly
+  long speed = vertical.value();
+  // clamp between max and min sane values
+  if (speed > 1000) {
+    speed = 1000;
+  } else if (speed < 0) {
+    speed = 0;
+  }
+
+  // determine sabertooth speed from stick position
+  // speed is from 100 to -100
+  if (speed > 650) {
+    speed = (speed - 600) / 4;
+  } else if (speed < 350) {
+    speed = (speed - 400) / 4;
+  } else {
+    speed = 0;
+  }
+
+  speed = -speed;
+
+  // modify for left/right
+  long direction = horizontal.value();
+  if (direction > 1000) {
+      direction = 1000;
+  } else if (direction < 0) {
+      direction = 0;
+  }
+
+  // >500 means joystick is pointing left
+  if (direction > 650) {
+    direction = 50 + (direction - 600) / 8;
+  } else if (direction < 350) {
+    direction = 50 + (direction - 400) / 8;
+  } else {
+    direction = 50;
+  }
+
+  int left = (2 * speed * direction * 30) / (100 * 100);
+  int right = (2 * speed * (100 - direction) * 30) / (100 * 100);
+
+  Serial.print("V/H raw:");
+  Serial.print(vertical.value());
+  Serial.print("/");
+  Serial.print(horizontal.value());
+  Serial.print(";");
+
+  Serial.print(" -- left/right speed:");
+  Serial.print(left);
+  Serial.print("/");
+  Serial.print(right);
+  Serial.print("\r\n");
+
+  send_velocity_to_sabertooth(left, right);
+
+  // toggle the run led every time
+  toggle_led();
 }
 
 // interrupt functions for logging encoder events
@@ -220,30 +201,7 @@ void right_encoder_interrupt() {
   RIGHT_PULSES++;
 }
 
-void read_sensor_state() {
-}
-
-void execute_command(const SerialCommand& cmd)
-{
-  if (cmd.type == SerialCommand::GETSTATE) {
-    // send state now
-    state.lastStateSentTimestamp = 0;
-  }
-
-  if (cmd.type == SerialCommand::GO) {
-    state.emergencyStop = false;
-    digitalWrite(StoppedLEDPin, LOW);
-  }
-
-  if (cmd.type == SerialCommand::VELOCITY) {
-    send_velocity_to_sabertooth(cmd.leftVelocity, cmd.rightVelocity);
-  }
-
-  if (cmd.type == SerialCommand::STOP) {
-    emergency_stop();
-  }
-}
-
+// code for talking to the sabertooth
 inline int clamp(int value, int min, int max)
 {
   if (value < min) {
@@ -258,10 +216,7 @@ void send_velocity_to_sabertooth(int left, int right)
 {
   left = clamp(left, -63, 63);
   right = clamp(right, -63, 63);
-  if (state.emergencyStop) {
-    left = 0;
-    right = 0;
-  }
+
   if (left == 0 && right == 0) {
     sabertoothSerial.write(uint8_t(0));
   } else {
@@ -270,170 +225,7 @@ void send_velocity_to_sabertooth(int left, int right)
   }
 }
 
-// sends the current program state to the computer
-void send_state(unsigned long now)
-{
-  if (state.lastStateSentTimestamp != 0 &&
-      now - state.lastStateSentTimestamp < StateSendMS) {
-    return;
-  }
-  Serial.print("C:");
-  Serial.print(state.commandsReceived, DEC);
-  Serial.print(";");
-
-  Serial.print("B:");
-  Serial.print(state.badCommandsReceived, DEC);
-  Serial.print(";");
-
-  Serial.print("L:");
-  Serial.print(now - state.lastCommandTimestamp, DEC);
-  Serial.print(";");
-
-  Serial.print("E:");
-  Serial.print(state.emergencyStop, DEC);
-  Serial.print(";");
-
-  Serial.print("!");
-  for(unsigned int i = 0; i < NumSensors; i++) {
-    if (!sensors[i])
-      continue;
-
-    sensors[i]->read();
-    Serial.print(sensors[i]->get_data());
-    Serial.print(";");
-  }
-
-  // special handling for encoders
-  Serial.print("LE:");
-  Serial.print(LEFT_PULSES);
-  Serial.print(";");
-  Serial.print("RE:");
-  Serial.print(RIGHT_PULSES);
-  Serial.print(";");
-
-  Serial.print("\r\n");
-
-  state.lastStateSentTimestamp = now;
-  toggle_led();
-}
-
-// reads data from the serial port and returns the last sent SerialCommand
-SerialCommand read_server_command()
-{
-  // Commands end with a '\n'
-  static char buf[20];
-  static int buf_pos = 0;
-  static bool buffer_overflow = false;
-  char c;
-
-  // read data from serial port and write it into buf
-  while ((c = Serial.read()) != -1) {
-    buf[buf_pos] = c;
-    
-    // we've read a whole command once we see a '\n'
-    if (c == '\n') {
-      break;
-
-    } else {
-      buf_pos++;
-      if (buf_pos == sizeof(buf)) {
-        // command buffer overflow
-        buf_pos = 0;
-        buffer_overflow = true;
-      }
-    }
-  }
-
-  // we read a full command from the serial port
-  if (buf[buf_pos] == '\n') {
-    SerialCommand cmd;
-    if (buffer_overflow) {
-      cmd = SerialCommand(SerialCommand::BAD);
-    } else {
-      cmd = parse_command_buffer(buf, buf_pos);
-    }
-
-    buf_pos = 0;
-    buffer_overflow = false;
-    for (int i = 0; i < sizeof(buf); i++) {
-        buf[i] = 0;
-    }
-
-    return cmd;
-
-  // haven't read a full command yet; lets return no command
-  } else {
-    return SerialCommand(SerialCommand::NONE);
-  }
-}
-
-// parses string read from incoming serial from the computer into a SerialCommand
-SerialCommand parse_command_buffer(const char* buf, int len)
-{
-  // Protocol from the server:
-  // V<left>,<right>\n  -- set motor velocities, int in [-63, 63]
-  // H\n                -- heartbeat
-  // S\n                -- causes an immediate send of the current state
-  // G\n                -- go (clears an emergency stop)
-  // X\n                -- stop (causes an emergency stop to occur)
-
-  SerialCommand cmd;
-  switch (buf[0]) {
-  case 'H': 
-    cmd.type = SerialCommand::HEARTBEAT;
-    break;
-  case 'G':
-    cmd.type = SerialCommand::GO;
-    break;
-  case 'S':
-    cmd.type = SerialCommand::GETSTATE;
-    break;
-  case 'X':
-    cmd.type = SerialCommand::STOP;
-    break;
-  case 'V':
-    cmd.type = SerialCommand::VELOCITY;
-    buf = scan_int(buf+1, &cmd.leftVelocity);
-    if (*buf != ',') {
-      cmd.type = SerialCommand::BAD;
-    } else {
-      buf = scan_int(buf+1, &cmd.rightVelocity);
-      if (*buf != '\n') {
-        cmd.type = SerialCommand::BAD;
-      }
-    }
-    break;
-  default:
-    cmd.type = SerialCommand::BAD;
-  }
-
-  return cmd;
-}
-
-// used to read an integer from serial data
-const char* scan_int(const char* buf, int *value)
-{
-  // initialize the value
-  *value = 0;
-
-  // determine the sign of the value
-  int sign = 1;
-  if (buf[0] == '-') {
-    sign = -1;
-    buf++;
-  }
-
-  // parse the value -- works as long as we encounter valid numbers
-  while (*buf >= '0' && *buf <= '9') {
-    *value = (10 * (*value)) + (*buf - '0');
-    buf++;
-  }
-
-  // we're done
-  *value = *value * sign;
-  return buf;
-}
-
+  
 void emergency_stop() 
 {
   state.emergencyStop = true;

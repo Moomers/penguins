@@ -14,6 +14,7 @@ class Sensor
 
     // Read data from the sensor and store it.
     virtual void read() = 0;
+
     // Return whatever buffered data has been read.
     virtual char *get_data() = 0;
 
@@ -30,6 +31,10 @@ class AnalogSensor : public Sensor
     // Sensor interface:
     virtual void read();
     virtual char *get_data();
+
+    unsigned int value() {
+      return last_value_;
+    }
 
   private:
     const byte pin_;
