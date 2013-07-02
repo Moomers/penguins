@@ -84,6 +84,7 @@ static struct State {
 
 /*************** Prototypes  *********************/
 
+void send_velocity_to_computer(int speed, int side, int left, int right);
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
@@ -120,6 +121,21 @@ void setup()
   digitalWrite(WarnLEDPin, HIGH);
 }
 
+inline int clamp(int value, int min, int max)
+{
+  if (value < min) {
+    return min;
+  } else if (value > max) {
+    return max;
+  }
+  return value;
+}
+
+
+const short FORWARD = 1;
+const short BACKWARD = -1;
+const short MAX_SPEED = 30;
+
 void loop()
 {
   //read out the sensors
@@ -130,36 +146,41 @@ void loop()
     sensors[i]->read();
   }
 
-  // speed is from 100 to -100
-  long speed = clamp(vertical.value(), 0, 1000);
+  short direction = FORWARD;
 
-  if (speed > 650) {
-    speed = (speed - 600) / 4;
-  } else if (speed < 350) {
-    speed = (speed - 400) / 4;
+  // speed is from 100 to -100
+  int speed = clamp(vertical.value(), 0, 1000);
+
+  if (speed > 550) {
+    speed = (speed - 550) / 4;
+    direction = BACKWARD;
+  } else if (speed < 380) {
+    speed = (-speed + 380) / 4;
   } else {
     speed = 0;
   }
 
-  // we wired the joystick backwards...
-  speed = -speed;
+  // direction is between -100 and 100
+  // -100 is all the way on the right
+  int side = clamp(horizontal.value(), 0, 1000);
 
-  // direction is between 0 and 100
-  // 50 is in the middle, 0 is all the way to the left
-  long direction = clamp(horizontal.value(), 0, 1000);
-
-  if (direction > 650) {
-    direction = 50 + (direction - 600) / 8;
-  } else if (direction < 350) {
-    direction = 50 + (direction - 400) / 8;
+  if (side > 550) {
+    side = (side - 550) / 4;
+  } else if (side < 380) {
+    side = (side - 380) / 4;
   } else {
-    direction = 50;
+    side = 0;
   }
 
-  int left = (2 * speed * direction * 30) / (100 * 100);
-  int right = (2 * speed * (100 - direction) * 30) / (100 * 100);
+  // get the left/right speed -- never more than speed
+  long left = direction * clamp(speed + side, 0, speed);
+  long right = direction * clamp(speed - side, 0, speed);
 
-  send_velocity_to_computer(left, right);
+  // proportional to the max speed we want sabertooth to go
+  left = MAX_SPEED * left / 100;
+  right = MAX_SPEED * right / 100;
+
+  send_velocity_to_computer(speed, side, left, right);
   send_velocity_to_sabertooth(left, right);
 
   // toggle the run led every time
@@ -178,16 +199,6 @@ void right_encoder_interrupt() {
 }
 
 // code for talking to the sabertooth
-inline int clamp(int value, int min, int max)
-{
-  if (value < min) {
-    return min;
-  } else if (value > max) {
-    return max;
-  }
-  return value;
-}
-
 void send_velocity_to_sabertooth(int left, int right)
 {
   left = clamp(left, -63, 63);
@@ -203,14 +214,21 @@ void send_velocity_to_sabertooth(int left, int right)
   }
 }
 
-void send_velocity_to_computer(left, right) {
+void send_velocity_to_computer(int speed, int side, int left, int right) {
   Serial.print("V/H raw:");
   Serial.print(vertical.value());
   Serial.print("/");
   Serial.print(horizontal.value());
   Serial.print(";");
 
-  Serial.print(" -- left/right speed:");
+  Serial.print("-- speed/side:");
+  Serial.print(speed);
+  Serial.print("/");
+  Serial.print(side);
+  Serial.print(";");
+
+
+  Serial.print(" -- left/right:");
   Serial.print(left);
   Serial.print("/");
   Serial.print(right);
