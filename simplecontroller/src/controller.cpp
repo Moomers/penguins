@@ -82,12 +82,34 @@ static struct State {
   bool runLED;
 } state;
 
+static struct Drive {
+  Drive() : forward(1),
+    backward(-1),
+    max_speed(30),
+    h_center(450),
+    v_center(450),
+    h_gap(50),
+    v_gap(50),
+    h_range(400),
+    v_range(400) { }
+  short forward;
+  short backward;
+  short max_speed;
+  short h_center;
+  short v_center;
+  short h_gap;
+  short v_gap;
+  short h_range;
+  short v_range;
+} drive;
+
 /*************** Prototypes  *********************/
 
 void send_velocity_to_computer(int speed, int side, int left, int right);
 void send_velocity_to_sabertooth(int left, int right);
 void left_encoder_interrupt();
 void right_encoder_interrupt();
+void read_sensors();
 void toggle_led();
 
 // begin code
@@ -117,8 +139,24 @@ void setup()
   pinMode(WarnLEDPin, OUTPUT);
   pinMode(RunLEDPin, OUTPUT);
 
-  // turn on the warn led to indicate a recent reset
+  // turn on the warn led to indicate calibration
   digitalWrite(WarnLEDPin, HIGH);
+
+  int h_reads = 0,
+      v_reads = 0,
+      reads = 16;
+
+  for (int i =0; i < reads; i++) {
+    read_sensors();
+    h_reads += horizontal.value();
+    v_reads += vertical.value();
+  }
+
+  drive.h_center = h_reads / reads;
+  drive.v_center = v_reads / reads;
+
+  // calibration complete
+  digitalWrite(WarnLEDPin, LOW);
 }
 
 inline int clamp(int value, int min, int max)
@@ -131,54 +169,49 @@ inline int clamp(int value, int min, int max)
   return value;
 }
 
-
-const short FORWARD = 1;
-const short BACKWARD = -1;
-const short MAX_SPEED = 30;
-
 void loop()
 {
-  //read out the sensors
-  for(unsigned int i = 0; i < NumSensors; i++) {
-    if (!sensors[i])
-      continue;
+  read_sensors();
 
-    sensors[i]->read();
-  }
+  short direction = drive.forward;
 
-  short direction = FORWARD;
+  int speed = clamp(
+          vertical.value(),
+          drive.v_center - drive.v_gap - drive.v_range,
+          drive.v_center + drive.v_gap + drive.v_range);
 
-  // speed is from 100 to -100
-  int speed = clamp(vertical.value(), 0, 1000);
-
-  if (speed > 550) {
-    speed = (speed - 550) / 4;
-    direction = BACKWARD;
-  } else if (speed < 380) {
-    speed = (-speed + 380) / 4;
+  // speed is from 0 to 100
+  if (speed > drive.v_center + drive.v_gap) {
+    speed = (speed - (drive.v_center + drive.v_gap)) / 4;
+    direction = drive.backward;
+  } else if (speed < drive.v_center - drive.v_gap) {
+    speed = (drive.v_center - drive.v_gap - speed) / 4;
   } else {
     speed = 0;
   }
 
-  // direction is between -100 and 100
+  // side is between -100 and 100
   // -100 is all the way on the right
-  int side = clamp(horizontal.value(), 0, 1000);
+  int side = clamp(
+          horizontal.value(),
+          drive.h_center - drive.h_gap - drive.h_range,
+          drive.h_center + drive.h_gap + drive.h_range);
 
-  if (side > 550) {
-    side = (side - 550) / 4;
-  } else if (side < 380) {
-    side = (side - 380) / 4;
+  if (side > drive.h_center + drive.h_gap) {
+    side = (side - (drive.h_center + drive.h_gap)) / 4;
+  } else if (side < (drive.h_center - drive.h_gap)) {
+    side = (side - (drive.h_center - drive.h_gap)) / 4;
   } else {
     side = 0;
   }
 
   // get the left/right speed -- never more than speed
-  long left = direction * clamp(speed + side, 0, speed);
   long right = direction * clamp(speed - side, 0, speed);
+  long left = direction * clamp(speed + side, 0, speed);
 
   // proportional to the max speed we want sabertooth to go
-  left = MAX_SPEED * left / 100;
-  right = MAX_SPEED * right / 100;
+  left = drive.max_speed * left / 100;
+  right = drive.max_speed * right / 100;
 
   send_velocity_to_computer(speed, side, left, right);
   send_velocity_to_sabertooth(left, right);
@@ -196,6 +229,17 @@ void left_encoder_interrupt() {
 volatile int RIGHT_PULSES = 0;
 void right_encoder_interrupt() {
   RIGHT_PULSES++;
+}
+
+void read_sensors()
+{
+  //read out the sensors
+  for(unsigned int i = 0; i < NumSensors; i++) {
+    if (!sensors[i])
+      continue;
+
+    sensors[i]->read();
+  }
 }
 
 // code for talking to the sabertooth
@@ -220,6 +264,13 @@ void send_velocity_to_computer(int speed, int side, int left, int right) {
   Serial.print("/");
   Serial.print(horizontal.value());
   Serial.print(";");
+
+  Serial.print("-- h/v center:");
+  Serial.print(drive.h_center);
+  Serial.print("/");
+  Serial.print(drive.v_center);
+  Serial.print(";");
+
 
   Serial.print("-- speed/side:");
   Serial.print(speed);
