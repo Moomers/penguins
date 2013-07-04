@@ -86,6 +86,7 @@ static struct Drive {
   Drive() : forward(1),
     backward(-1),
     max_speed(30),
+    turn_assist(10),
     h_center(450),
     v_center(450),
     h_gap(50),
@@ -95,6 +96,7 @@ static struct Drive {
   short forward;
   short backward;
   short max_speed;
+  short turn_assist;
   short h_center;
   short v_center;
   short h_gap;
@@ -205,9 +207,13 @@ void loop()
     side = 0;
   }
 
-  // get the left/right speed -- never more than speed
-  long right = direction * clamp(speed - side, 0, speed);
-  long left = direction * clamp(speed + side, 0, speed);
+  // allow more careful controls while turning
+  short min_speed = -drive.turn_assist * direction;
+  short max_speed = speed + (drive.turn_assist * direction);
+
+  // get the left/right speed -- never more than limits
+  long right = direction * clamp(speed - side, min_speed, max_speed);
+  long left = direction * clamp(speed + side, min_speed, max_speed);
 
   // proportional to the max speed we want sabertooth to go
   left = drive.max_speed * left / 100;
