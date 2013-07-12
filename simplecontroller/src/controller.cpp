@@ -86,7 +86,7 @@ static struct Drive {
   Drive() : forward(1),
     backward(-1),
     max_speed(30),
-    turn_assist(10),
+    turn_assist(15),
     h_center(450),
     v_center(450),
     h_gap(50),
