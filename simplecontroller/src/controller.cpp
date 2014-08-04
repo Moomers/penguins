@@ -85,7 +85,7 @@ static struct State {
 static struct Drive {
   Drive() : forward(1),
     backward(-1),
-    max_speed(30),
+    max_speed(45),
     turn_assist(15),
     h_center(450),
     v_center(450),

@@ -1,0 +1,2 @@
+
+ino build && ino upload
